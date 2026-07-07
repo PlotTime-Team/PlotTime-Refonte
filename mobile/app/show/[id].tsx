@@ -45,9 +45,15 @@ export default function ShowDetail() {
     mutationFn: (seen: boolean) => api.post(`/api/movies/${id}/${seen ? 'watched' : 'unwatched'}`),
     onSettled: refresh,
   });
+  // Suivre (façon TV Time) : série -> statut « Pas commencé », film -> watchlist.
+  const follow = useMutation({
+    mutationFn: () => api.post(isMovie ? `/api/movies/${id}/watchlist` : `/api/shows/${id}/follow`),
+    onSettled: refresh,
+  });
 
   if (detail.isLoading || !detail.data) return <Loading />;
   const media: MediaDto = detail.data.media;
+  const isFollowed = media.userStatus != null;
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.white }}>
@@ -65,9 +71,20 @@ export default function ShowDetail() {
           <Pressable onPress={() => router.back()} hitSlop={8}>
             <Feather name="chevron-down" size={30} color="#fff" />
           </Pressable>
-          <Pressable onPress={() => setMenu(true)} hitSlop={8}>
-            <Feather name="more-horizontal" size={28} color="#fff" />
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            {!isFollowed ? (
+              <Pressable style={styles.followSquare} onPress={() => follow.mutate()} hitSlop={6} disabled={follow.isPending}>
+                {follow.isPending ? (
+                  <ActivityIndicator color={COLORS.yellow} size="small" />
+                ) : (
+                  <Feather name="plus" size={24} color={COLORS.yellow} />
+                )}
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => setMenu(true)} hitSlop={8}>
+              <Feather name="more-horizontal" size={28} color="#fff" />
+            </Pressable>
+          </View>
         </View>
         <View style={styles.heroTitleWrap}>
           <Text style={styles.heroTitle}>{media.title}</Text>
@@ -309,6 +326,7 @@ function EpisodesTab({ showId, onChange }: { showId: string; onChange: () => voi
 const styles = StyleSheet.create({
   hero: { height: 240, backgroundColor: '#1a1a22', justifyContent: 'flex-end', overflow: 'hidden' },
   heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  followSquare: { width: 42, height: 42, borderRadius: 10, borderWidth: 2.5, borderColor: COLORS.yellow, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
   heroBtns: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14 },
   heroTitleWrap: { padding: 20 },
   heroTitle: { color: '#fff', fontSize: 27, fontWeight: '800' },

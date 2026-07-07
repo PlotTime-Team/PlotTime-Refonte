@@ -174,15 +174,20 @@ export async function movieRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // `follow: false` : consultation de la fiche sans ajout à la watchlist.
   app.post('/api/movies/add-from-tmdb', async (request, reply) => {
-    const { tmdbId } = z.object({ tmdbId: z.string() }).parse(request.body);
+    const { tmdbId, follow } = z
+      .object({ tmdbId: z.string(), follow: z.boolean().default(true) })
+      .parse(request.body);
     const media = await ensureMediaFromTmdb('movie', tmdbId);
     if (!media) return reply.code(502).send({ error: 'tmdb_unavailable' });
-    await prisma.userMediaStatus.upsert({
-      where: { userId_mediaId: { userId: request.userId, mediaId: media.id } },
-      create: { userId: request.userId, mediaId: media.id, status: 'watchlist' },
-      update: {},
-    });
+    if (follow) {
+      await prisma.userMediaStatus.upsert({
+        where: { userId_mediaId: { userId: request.userId, mediaId: media.id } },
+        create: { userId: request.userId, mediaId: media.id, status: 'watchlist' },
+        update: {},
+      });
+    }
     return { mediaId: media.id };
   });
 }

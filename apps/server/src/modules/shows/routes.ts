@@ -493,30 +493,62 @@ export async function showRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Ajout d'une série depuis un id TMDb (recherche/explore).
+  // `follow: false` crée/retrouve la fiche SANS l'ajouter au suivi de
+  // l'utilisateur — pour consulter une série depuis la recherche (façon TV
+  // Time : taper une série ouvre sa fiche, seul le + la suit).
   app.post('/api/shows/add-from-tmdb', async (request, reply) => {
-    const { tmdbId } = z.object({ tmdbId: z.string() }).parse(request.body);
+    const { tmdbId, follow } = z
+      .object({ tmdbId: z.string(), follow: z.boolean().default(true) })
+      .parse(request.body);
     const { ensureMediaFromTmdb } = await import('../../services/tmdb/index.js');
     const media = await ensureMediaFromTmdb('show', tmdbId);
     if (!media) return reply.code(502).send({ error: 'tmdb_unavailable' });
-    await prisma.userMediaStatus.upsert({
-      where: { userId_mediaId: { userId: request.userId, mediaId: media.id } },
-      create: { userId: request.userId, mediaId: media.id, status: 'not_started' },
-      update: {},
-    });
+    if (follow) {
+      await prisma.userMediaStatus.upsert({
+        where: { userId_mediaId: { userId: request.userId, mediaId: media.id } },
+        create: { userId: request.userId, mediaId: media.id, status: 'not_started' },
+        update: {},
+      });
+    }
     return { mediaId: media.id };
   });
 
   app.post('/api/shows/add-from-tvdb', async (request, reply) => {
-    const { tvdbId } = z.object({ tvdbId: z.string() }).parse(request.body);
+    const { tvdbId, follow } = z
+      .object({ tvdbId: z.string(), follow: z.boolean().default(true) })
+      .parse(request.body);
     const { ensureShowFromTvdb } = await import('../../services/tvdb/index.js');
     const media = await ensureShowFromTvdb(tvdbId);
     if (!media) return reply.code(502).send({ error: 'tvdb_unavailable' });
+    if (follow) {
+      await prisma.userMediaStatus.upsert({
+        where: { userId_mediaId: { userId: request.userId, mediaId: media.id } },
+        create: { userId: request.userId, mediaId: media.id, status: 'not_started' },
+        update: {},
+      });
+    }
+    return { mediaId: media.id };
+  });
+
+  // Suivre / ne plus suivre une série déjà présente dans le catalogue local.
+  // Statut par défaut « not_started » : il ne passera à « watching » qu'au
+  // premier épisode coché (recalculateShowStatus).
+  app.post('/api/shows/:id/follow', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const media = await prisma.media.findFirst({ where: { id, type: 'show' } });
+    if (!media) return reply.code(404).send({ error: 'not_found' });
     await prisma.userMediaStatus.upsert({
-      where: { userId_mediaId: { userId: request.userId, mediaId: media.id } },
-      create: { userId: request.userId, mediaId: media.id, status: 'not_started' },
+      where: { userId_mediaId: { userId: request.userId, mediaId: id } },
+      create: { userId: request.userId, mediaId: id, status: 'not_started' },
       update: {},
     });
-    return { mediaId: media.id };
+    return { ok: true, following: true };
+  });
+
+  app.delete('/api/shows/:id/follow', async (request) => {
+    const { id } = request.params as { id: string };
+    await prisma.userMediaStatus.deleteMany({ where: { userId: request.userId, mediaId: id } });
+    return { ok: true, following: false };
   });
 }
 
