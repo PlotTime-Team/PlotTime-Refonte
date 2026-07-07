@@ -39,3 +39,11 @@ IP : `ipconfig | Select-String "IPv4"`.
 ## Branche de travail
 
 Développer sur `claude/seriestime-repo-setup-3wyz3c` (PR #1 vers `main`).
+
+## Suivi d'avancement (règle d'équipe)
+
+**Après chaque modification ou ajout de fonctionnalité, mettre à jour
+`docs/AVANCEMENT.md`** : tableau « État par domaine » + nouvelle entrée datée
+dans le « Journal des modifications » (inclure ce fichier dans le même commit
+que la fonctionnalité). Un collègue travaille aussi sur le repo et s'appuie
+sur ce fichier.

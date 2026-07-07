@@ -163,6 +163,7 @@ pnpm test                       # unitaires (core) + intégration (API serveur)
 
 ## Documentation
 
+- [docs/AVANCEMENT.md](docs/AVANCEMENT.md) — **état d'avancement du projet** (à mettre à jour après chaque évolution)
 - [docs/SPEC_SERIETIME.md](docs/SPEC_SERIETIME.md) — cahier des charges complet
 - [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) — arborescence, Prisma, routes, phases
 - [mobile/README.md](mobile/README.md) — app mobile Expo (lancer avec Expo Go, build APK)
