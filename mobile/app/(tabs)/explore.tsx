@@ -36,7 +36,10 @@ export default function ExploreScreen() {
   });
   const search = useQuery({
     queryKey: ['search', debouncedQuery],
-    queryFn: () => api.get<{ results: FeedItem[] }>(`/api/search?q=${encodeURIComponent(debouncedQuery)}&type=media`),
+    queryFn: () =>
+      api.get<{ results: FeedItem[]; sources?: { tmdb: boolean; tvdb: boolean } }>(
+        `/api/search?q=${encodeURIComponent(debouncedQuery)}&type=media`,
+      ),
     enabled: debouncedQuery.length > 1,
     placeholderData: keepPreviousData, // garde les résultats affichés pendant la frappe
   });
@@ -63,7 +66,12 @@ export default function ExploreScreen() {
       </View>
 
       {searching ? (
-        <SearchResults results={search.data?.results} loading={search.isLoading} query={query} />
+        <SearchResults
+          results={search.data?.results}
+          sources={search.data?.sources}
+          loading={search.isLoading}
+          query={query}
+        />
       ) : (
         <Feed items={data?.feed} loading={isLoading} />
       )}
@@ -136,7 +144,17 @@ function Feed({ items, loading }: { items?: FeedItem[]; loading: boolean }) {
   );
 }
 
-function SearchResults({ results, loading, query }: { results?: FeedItem[]; loading: boolean; query: string }) {
+function SearchResults({
+  results,
+  sources,
+  loading,
+  query,
+}: {
+  results?: FeedItem[];
+  sources?: { tmdb: boolean; tvdb: boolean };
+  loading: boolean;
+  query: string;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [addingKey, setAddingKey] = useState<string | null>(null);
@@ -172,8 +190,22 @@ function SearchResults({ results, loading, query }: { results?: FeedItem[]; load
   };
 
   if (loading) return <Loading />;
-  if (!results || results.length === 0)
+  if (!results || results.length === 0) {
+    // Aucune source externe configurée : le vrai problème est côté serveur,
+    // autant le dire clairement plutôt que « aucun résultat ».
+    if (sources && !sources.tmdb && !sources.tvdb) {
+      return (
+        <EmptyState
+          title="Recherche externe non configurée"
+          message={
+            'Le serveur n’a aucune source de contenu active.\n' +
+            'Renseignez TVDB_ENABLED=true et TVDB_API_KEY (ou une clé TMDb) dans apps/server/.env, puis redémarrez le serveur.'
+          }
+        />
+      );
+    }
     return <EmptyState title="Toutes nos excuses" message={`Nous n'avons trouvé aucun résultat pour « ${query} »`} />;
+  }
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
       {results.map((r) => {

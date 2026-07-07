@@ -27,7 +27,9 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       .object({ q: z.string().default(''), type: z.enum(['media', 'lists', 'people']).default('media') })
       .parse(request.query ?? {});
     const q = query.q.trim();
-    if (!q) return { results: [] };
+    // L'app affiche un message clair si aucune source externe n'est configurée.
+    const sources = { tmdb: tmdbEnabled(), tvdb: tvdbEnabled() };
+    if (!q) return { results: [], sources };
 
     if (query.type === 'lists') {
       const lists = await prisma.mediaList.findMany({
@@ -130,7 +132,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
         });
       }
     }
-    return { results };
+    return { results, sources };
   });
 
   // Spec §20.3 : flux personnel de recommandations.
