@@ -143,16 +143,36 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       orderBy: { lastWatchedAt: 'desc' },
       take: 5,
     });
+    const mediaKeyFields = { tmdbId: true, type: true, title: true, originalTitle: true, year: true } as const;
     const disliked = await prisma.userMediaStatus.findMany({
       where: { userId: request.userId, isHidden: true },
-      select: { media: { select: { tmdbId: true } } },
+      select: { media: { select: mediaKeyFields } },
     });
-    const dislikedIds = new Set(disliked.map((d) => d.media.tmdbId).filter(Boolean));
     const inLibrary = await prisma.userMediaStatus.findMany({
       where: { userId: request.userId },
-      select: { media: { select: { tmdbId: true } } },
+      select: { media: { select: mediaKeyFields } },
     });
-    const libraryIds = new Set(inLibrary.map((d) => d.media.tmdbId).filter(Boolean));
+    // Les médias ajoutés via TheTVDB n'ont pas toujours de tmdbId : on compare
+    // alors type + titre normalisé (+ année quand elle est connue des deux côtés),
+    // sinon une série déjà suivie réapparaît dans les recommandations.
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    type MediaKey = { tmdbId: string | null; type: string; title: string; originalTitle: string | null; year: number | null };
+    const toEntry = (m: MediaKey) => ({
+      tmdbId: m.tmdbId,
+      type: m.type,
+      titles: [m.title, m.originalTitle].filter((t): t is string => Boolean(t)).map(norm),
+      year: m.year,
+    });
+    const dislikedEntries = disliked.map((d) => toEntry(d.media));
+    const libraryEntries = inLibrary.map((d) => toEntry(d.media));
+    const isKnown = (type: string, tmdbId: string, title: string, year: number | null) =>
+      [...dislikedEntries, ...libraryEntries].some(
+        (e) =>
+          (e.tmdbId != null && e.tmdbId === tmdbId) ||
+          (e.type === type &&
+            e.titles.includes(norm(title)) &&
+            (e.year == null || year == null || e.year === year)),
+      );
 
     const cards: SearchResult[] = [];
     if (tmdbEnabled()) {
@@ -161,16 +181,19 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
         if (!status.media.tmdbId) continue;
         const recs = await tmdbRecommendations(status.media.type === 'show' ? 'tv' : 'movie', status.media.tmdbId);
         for (const r of recs.slice(0, 3)) {
-          if (dislikedIds.has(String(r.id)) || libraryIds.has(String(r.id))) continue;
+          const recType = status.media.type === 'show' ? 'show' : 'movie';
+          const recTitle = r.name ?? r.title ?? '';
+          const recYear = (r.first_air_date ?? r.release_date)
+            ? new Date((r.first_air_date ?? r.release_date)!).getFullYear()
+            : null;
+          if (isKnown(recType, String(r.id), recTitle, recYear)) continue;
           cards.push({
             id: null,
             tmdbId: String(r.id),
             tvdbId: null,
-            type: status.media.type === 'show' ? 'show' : 'movie',
-            title: r.name ?? r.title ?? '',
-            year: (r.first_air_date ?? r.release_date)
-              ? new Date((r.first_air_date ?? r.release_date)!).getFullYear()
-              : null,
+            type: recType,
+            title: recTitle,
+            year: recYear,
             posterPath: r.poster_path ?? null,
             backdropPath: r.backdrop_path ?? null,
             overview: r.overview ?? null,
@@ -180,16 +203,19 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       }
       const [tv, movies] = await Promise.all([tmdbTrending('tv'), tmdbTrending('movie')]);
       for (const r of [...tv.slice(0, 6), ...movies.slice(0, 6)]) {
-        if (dislikedIds.has(String(r.id)) || libraryIds.has(String(r.id))) continue;
+        const trendType = r.title ? 'movie' : 'show';
+        const trendTitle = r.name ?? r.title ?? '';
+        const trendYear = (r.first_air_date ?? r.release_date)
+          ? new Date((r.first_air_date ?? r.release_date)!).getFullYear()
+          : null;
+        if (isKnown(trendType, String(r.id), trendTitle, trendYear)) continue;
         cards.push({
           id: null,
           tmdbId: String(r.id),
           tvdbId: null,
-          type: r.title ? 'movie' : 'show',
-          title: r.name ?? r.title ?? '',
-          year: (r.first_air_date ?? r.release_date)
-            ? new Date((r.first_air_date ?? r.release_date)!).getFullYear()
-            : null,
+          type: trendType,
+          title: trendTitle,
+          year: trendYear,
           posterPath: r.poster_path ?? null,
           backdropPath: r.backdrop_path ?? null,
           overview: r.overview ?? null,

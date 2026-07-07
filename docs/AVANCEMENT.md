@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-07** (Claude)
+Dernière mise à jour : **2026-07-08** (Claude, avec Benjamin)
 
 ---
 
@@ -29,7 +29,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Authentification multi-comptes (e-mail + mot de passe) | ✅ Fait | Inscription/connexion, sessions 30 j, données isolées par compte (testé) |
 | SSO Google / Facebook | ⏸ Préparé, désactivé | Prêt côté serveur (`/api/auth/oauth`) ; nécessite ids OAuth + dev build Expo |
 | Contenu séries via TheTVDB | ✅ Fait | Recherche, fiche, saisons/épisodes, titres/synopsis FR, artworks ; clé dans `apps/server/.env` |
-| Contenu films / tendances via TMDb | ⏳ En attente de clé | Code prêt et branché ; sans clé : pas de flux Explorer ni d'images films |
+| Contenu films / tendances via TMDb | ✅ Fait | Clé TMDb (compte Benjamin) configurée sur le serveur de prod ; flux Explorer et images films actifs |
 | File « À voir » / « À venir » | ✅ Fait | Groupes TV Time (pas commencé, à voir, etc.) ; « Regarder plus tard » exclu des deux |
 | Fiche série/film façon TV Time | ✅ Fait | Barre « + AJOUTER » → « ✓ AJOUTÉE ! », bannière/affiche, onglets À propos / Épisodes / Discussion |
 | Menu « … » de la fiche | ✅ Fait | Personnaliser (affiche + bannière, séries **et** films), Favoris, Ajouter à une liste, Regarder plus tard, Supprimer, Partager |
@@ -42,21 +42,56 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Notifications push (OS) | ⏸ Non commencé | Nécessite dev build Expo + tokens Expo Push (la génération d'événements existe déjà) |
 | Import ZIP TV Time | ✅ Fait (v. initiale) | Analyse, matching, résolution manuelle, application |
 | Sauvegarde / restauration JSON | ✅ Fait (v. initiale) | Par compte |
-| Hébergement VPS | ⏳ À faire | Choix du fournisseur à trancher ; `Dockerfile.server` + `docker-compose.yml` prêts ; URL à baker dans `mobile/app.json` (`expo.extra.serverUrl`) |
-| Distribution (APK / stores) | ⏳ À faire | EAS Build documenté dans le README ; comptes développeur à créer |
+| Hébergement VPS | ✅ Fait | Prod sur le VPS Hostinger de Benjamin : `https://serietime.studio-vives.fr` (Docker isolé, HTTPS Let's Encrypt, backup DB nocturne) |
+| Web app (navigateur / écran d'accueil) | ✅ Fait | Export Expo web servi par Nginx à la racine du domaine (`/api` proxifié) ; utilisable iPhone + Android sans store |
+| Distribution native (APK / stores) | ⏳ Optionnel | EAS Build documenté dans le README ; la web app couvre déjà l'usage quotidien |
 
 ## Prochaines étapes (par priorité)
 
-1. **Clé TMDb** (gratuite) → active le flux Explorer (tendances/recommandations) et les images films.
-2. **VPS** : choisir le fournisseur, déployer via Docker, configurer HTTPS + `.env`, baker l'URL dans l'app.
+0. **Retours d'usage de Benjamin (08/07, première vraie session sur l'app)** :
+   - **Explorer : pull-to-refresh** pour renouveler les recommandations (ajouter un
+     `RefreshControl` + varier les résultats côté serveur : mélange ou pagination
+     TMDb, aujourd'hui le même flux revient à l'identique).
+   - **Fiche série, sondage « Qu'est-ce qui vous intéresse le plus ? »** : permettre
+     plusieurs choix (aujourd'hui une seule réponse possible).
+   - **Coche épisode : latence** — l'app attend la réponse serveur avant d'afficher
+     la coche. Passer en mise à jour optimiste (cocher tout de suite, revenir en
+     arrière si l'API échoue), via TanStack Query.
+   - **Titres longs qui débordent** sur les cartes de saisons/arcs (ex. « Arc
+     Reverse Mountain / Whisky Peak » sur One Piece) : tronquer (`numberOfLines`).
+   - **Vignettes d'épisodes manquantes** (placeholder gris) pour les séries ajoutées
+     via TheTVDB : récupérer les images d'épisodes à l'ajout ou à la volée.
+   - **Épisodes futurs** : les afficher avec image + badge « À venir » + date de
+     diffusion (liste des épisodes ET onglet « À VENIR », qui n'a aucune image).
+1. **UX connexion web app** : rediriger vers l'écran de connexion sur réponse 401 (aujourd'hui : « aucun résultat » / spinner infini quand la session manque) ; ajouter les metas PWA à l'export web (apple-touch-icon, titre, plein écran).
+2. **`expo.extra.serverUrl`** : décider comment baker l'URL de prod sans casser le dev local d'Étienne (ex. `app.config.js` + variable d'env) — pour l'instant l'URL est bakée uniquement dans le build web déployé.
 3. Option « Ne plus suivre » / gestion fine depuis les listes du profil (l'API existe : `DELETE /api/shows/:id/tracking`).
 4. Notifications push (quand on passera au dev build Expo).
 5. SSO Google/Facebook (ids OAuth à créer, dev build requis).
-6. Publication (EAS Build APK, puis stores).
+6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
+
+### 2026-07-08 — Claude (avec Benjamin)
+- **Déploiement production** sur le VPS Hostinger de Benjamin : conteneur Docker isolé
+  (plafonds 512 Mo RAM / 1 CPU, port bindé sur 127.0.0.1), Nginx en frontal, HTTPS
+  Let's Encrypt auto-renouvelé → **https://serietime.studio-vives.fr** (`/health` OK).
+- **Web app** : export Expo web (`npx expo export -p web`) servi par Nginx à la racine
+  du domaine, `/api` + `/health` proxifiés vers le conteneur (même origine, pas de CORS).
+  Validée sur iPhone (Safari + icône écran d'accueil) et testée de bout en bout
+  (inscription, recherche, ajout de série).
+- **Clé TMDb configurée en prod** → tendances/recommandations Explorer + images films actifs.
+- **Sauvegarde automatique de la base** : cron quotidien 4 h 30 (`sqlite3 .backup` + gzip,
+  rotation 14 jours) sur le VPS.
+- **Correctif feed Explorer** (`apps/server/src/modules/search/routes.ts`) : les médias
+  ajoutés via TheTVDB (sans `tmdbId`) n'étaient jamais reconnus comme « déjà dans la
+  bibliothèque » et réapparaissaient dans les recommandations/tendances. Le filtre
+  compare désormais aussi type + titre normalisé (+ année quand connue des deux côtés),
+  pour la bibliothèque comme pour les « non appréciés ». Typecheck + 74 tests verts.
+- Pièges web app iOS documentés : stockage séparé Safari/icône (se connecter dans la
+  web app), créer l'icône depuis la racine du site, Brave Shields bloque les affiches.
 
 ### 2026-07-07 — Claude
 - **Édition de profil** (écran `/profile/edit`) : photo de profil (upload via

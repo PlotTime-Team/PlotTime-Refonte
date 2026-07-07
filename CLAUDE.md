@@ -2,12 +2,14 @@
 
 > Nouveau sur le projet ? Suivre **`docs/ONBOARDING.md`** (installation complète).
 
-## Environnements locaux (Windows / PowerShell)
+## Environnements locaux
 
-- **Étienne : `C:\Users\etien\SerieTime`** — toujours préfixer les commandes
-  PowerShell par `cd C:\Users\etien\SerieTime` (oubli fréquent → commandes
-  lancées depuis `C:\WINDOWS\system32`).
-- **<collègue : ajoute ici le chemin de ton clone>**
+- **Étienne (Windows / PowerShell) : `C:\Users\etien\SerieTime`** — toujours
+  préfixer les commandes PowerShell par `cd C:\Users\etien\SerieTime` (oubli
+  fréquent → commandes lancées depuis `C:\WINDOWS\system32`).
+- **Benjamin (macOS / zsh) : `/Users/ben/Desktop/TVDB`** — `corepack enable`
+  échoue (droits sur `/usr/local/bin`) : utiliser `corepack pnpm <cmd>` au lieu de
+  `pnpm <cmd>`, ou le shim `~/.local/bin/pnpm` (déjà créé). Chemins Unix (`/`).
 - Gestionnaires : **pnpm** pour le serveur/monorepo, **npm** pour `mobile/`.
 - Node ≥ 20 requis. `corepack enable` une fois pour pnpm.
 
