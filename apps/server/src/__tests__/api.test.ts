@@ -335,6 +335,37 @@ describe('SerieTime API', () => {
     expect(banner.statusCode).toBe(200);
   });
 
+  it('change l’affiche et la bannière d’un film', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/movies/profile', headers: auth() });
+    const movie = res.json().seen.find((m: { title: string }) => m.title === 'Mickey 17');
+    expect(movie).toBeTruthy();
+
+    const poster = await app.inject({
+      method: 'POST',
+      url: `/api/movies/${movie.id}/poster`,
+      payload: { posterPath: '/mickey-poster.jpg' },
+      headers: auth(),
+    });
+    expect(poster.statusCode).toBe(200);
+    const banner = await app.inject({
+      method: 'POST',
+      url: `/api/movies/${movie.id}/banner`,
+      payload: { backdropPath: '/mickey-banner.jpg' },
+      headers: auth(),
+    });
+    expect(banner.statusCode).toBe(200);
+
+    const images = await app.inject({ method: 'GET', url: `/api/movies/${movie.id}/images`, headers: auth() });
+    expect(images.statusCode).toBe(200);
+    expect(images.json().selectedPoster).toBe('/mickey-poster.jpg');
+    expect(images.json().selectedBackdrop).toBe('/mickey-banner.jpg');
+    expect(images.json().posters).toContain('/mickey-poster.jpg');
+
+    const detail = await app.inject({ method: 'GET', url: `/api/movies/${movie.id}`, headers: auth() });
+    expect(detail.json().media.posterPath).toBe('/mickey-poster.jpg');
+    expect(detail.json().media.backdropPath).toBe('/mickey-banner.jpg');
+  });
+
   it('exporte une sauvegarde SerieTime', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/backup/export', headers: auth() });
     expect(res.statusCode).toBe(200);

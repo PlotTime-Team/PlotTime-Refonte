@@ -174,6 +174,48 @@ export async function movieRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Personnalisation de l'affiche et de la bannière (même API que les séries).
+  app.post('/api/movies/:id/poster', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { posterPath } = z.object({ posterPath: z.string() }).parse(request.body);
+    const media = await prisma.media.findFirst({ where: { id, type: 'movie' } });
+    if (!media) return reply.code(404).send({ error: 'not_found' });
+    await prisma.media.update({ where: { id }, data: { posterPath } });
+    return { ok: true };
+  });
+
+  app.post('/api/movies/:id/banner', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { backdropPath } = z.object({ backdropPath: z.string() }).parse(request.body);
+    const media = await prisma.media.findFirst({ where: { id, type: 'movie' } });
+    if (!media) return reply.code(404).send({ error: 'not_found' });
+    await prisma.media.update({ where: { id }, data: { backdropPath } });
+    return { ok: true };
+  });
+
+  // Images disponibles pour la personnalisation (TMDb + valeurs actuelles).
+  app.get('/api/movies/:id/images', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const media = await prisma.media.findFirst({ where: { id, type: 'movie' } });
+    if (!media) return reply.code(404).send({ error: 'not_found' });
+    let posters: string[] = media.posterPath ? [media.posterPath] : [];
+    let backdrops: string[] = media.backdropPath ? [media.backdropPath] : [];
+    if (media.tmdbId) {
+      const { tmdbImages } = await import('../../services/tmdb/images.js');
+      const images = await tmdbImages('movie', media.tmdbId).catch(() => null);
+      if (images) {
+        posters = [...new Set([...posters, ...images.posters])].slice(0, 30);
+        backdrops = [...new Set([...backdrops, ...images.backdrops])].slice(0, 30);
+      }
+    }
+    return {
+      posters,
+      backdrops,
+      selectedPoster: media.posterPath,
+      selectedBackdrop: media.backdropPath,
+    };
+  });
+
   // Supprimer le film du suivi (équivalent « Supprimer » du menu, spec §32.7).
   app.delete('/api/movies/:id/tracking', async (request, reply) => {
     const { id } = request.params as { id: string };

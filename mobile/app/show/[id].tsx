@@ -165,9 +165,7 @@ export default function ShowDetail() {
           <View style={styles.statusRow}>
             <Text style={styles.statusText}>{STATUS_LABELS[media.userStatus ?? 'not_started']}</Text>
           </View>
-          {!isMovie ? (
-            <SheetItem icon="edit-2" label="Personnaliser" onPress={() => { setMenu(false); setPersonalize(true); }} />
-          ) : null}
+          <SheetItem icon="edit-2" label="Personnaliser" onPress={() => { setMenu(false); setPersonalize(true); }} />
           <SheetItem
             icon="heart"
             color={media.isFavorite ? COLORS.red : COLORS.black}
@@ -187,14 +185,13 @@ export default function ShowDetail() {
         </View>
       </Modal>
 
-      {!isMovie ? (
-        <PersonalizeSheet
-          mediaId={String(id)}
-          visible={personalize}
-          onClose={() => setPersonalize(false)}
-          onApplied={(what) => { refresh(); showToast(what === 'poster' ? 'Affiche mise à jour' : 'Bannière mise à jour'); }}
-        />
-      ) : null}
+      <PersonalizeSheet
+        mediaId={String(id)}
+        isMovie={isMovie}
+        visible={personalize}
+        onClose={() => setPersonalize(false)}
+        onApplied={(what) => { refresh(); showToast(what === 'poster' ? 'Affiche mise à jour' : 'Bannière mise à jour'); }}
+      />
       <ListsSheet
         mediaId={String(id)}
         visible={listsOpen}
@@ -218,21 +215,24 @@ function SheetItem({ icon, label, onPress, color, last }: { icon: keyof typeof F
 // disponibles (TMDb + TheTVDB), comme le bottom sheet de TV Time.
 function PersonalizeSheet({
   mediaId,
+  isMovie,
   visible,
   onClose,
   onApplied,
 }: {
   mediaId: string;
+  isMovie: boolean;
   visible: boolean;
   onClose: () => void;
   onApplied: (what: 'poster' | 'banner') => void;
 }) {
+  const base = isMovie ? 'movies' : 'shows';
   const [busyUri, setBusyUri] = useState<string | null>(null);
   const images = useQuery({
-    queryKey: ['show-images', mediaId],
+    queryKey: ['media-images', base, mediaId],
     queryFn: () =>
       api.get<{ posters: string[]; backdrops: string[]; selectedPoster: string | null; selectedBackdrop: string | null }>(
-        `/api/shows/${mediaId}/images`,
+        `/api/${base}/${mediaId}/images`,
       ),
     enabled: visible,
   });
@@ -241,8 +241,8 @@ function PersonalizeSheet({
     if (busyUri) return;
     setBusyUri(uri);
     try {
-      if (what === 'poster') await api.post(`/api/shows/${mediaId}/poster`, { posterPath: uri });
-      else await api.post(`/api/shows/${mediaId}/banner`, { backdropPath: uri });
+      if (what === 'poster') await api.post(`/api/${base}/${mediaId}/poster`, { posterPath: uri });
+      else await api.post(`/api/${base}/${mediaId}/banner`, { backdropPath: uri });
       images.refetch();
       onApplied(what);
     } finally {
@@ -287,7 +287,7 @@ function PersonalizeSheet({
             </View>
             <Text style={[pstyles.section, { marginTop: 24 }]}>Bannière</Text>
             {(images.data?.backdrops ?? []).length === 0 ? (
-              <Text style={pstyles.emptyNote}>Aucune bannière disponible pour cette série.</Text>
+              <Text style={pstyles.emptyNote}>{isMovie ? 'Aucune bannière disponible pour ce film.' : 'Aucune bannière disponible pour cette série.'}</Text>
             ) : (
               <View style={{ gap: 12 }}>
                 {(images.data?.backdrops ?? []).map((uri) => {
