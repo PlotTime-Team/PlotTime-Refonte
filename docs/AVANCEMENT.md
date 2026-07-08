@@ -66,6 +66,21 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
 
+### 2026-07-08 — Claude (4)
+- **Cartes « À voir » (onglet Séries) recalées pixel à pixel sur TV Time** — un
+  gros delta de mise en page avait été signalé (cartes/texte trop grands, code
+  épisode qui passait sur 2 lignes). `components/EpisodeQueueCard.tsx` :
+  - dimensions réduites à celles de TV Time : vignette 96, coche 44, code 23,
+    titre 16, carte ~112 min (≈15 % de la hauteur d'écran, comme TV Time) →
+    ~5 cartes visibles au lieu d'une seule ;
+  - **code épisode toujours sur une ligne** (`numberOfLines`) et **« +N » restants**
+    réduit/discret à droite, il ne casse plus jamais la ligne du code.
+- **Badges façon TV Time** (`apps/server` file « À voir ») :
+  - **PREMIERE** désormais aussi pour le **1ᵉʳ épisode d'une saison** (pas seulement
+    d'une série) — ex. « S02 | E01 » ;
+  - **NOUVEAU** resserré à la **fenêtre de 3 jours** après diffusion (au lieu de 7),
+    et uniquement pour un épisode déjà diffusé.
+
 ### 2026-07-08 — Claude (3)
 - **Liste des saisons (onglet Épisodes) alignée sur TV Time** :
   - Les **épisodes spéciaux (saison 0) passent en bas** de la liste (avant en haut).
