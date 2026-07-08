@@ -63,6 +63,9 @@ Retours d'usage de la première vraie session + finitions web app :
   côté serveur (page de tendances TMDb aléatoire + mélange + échantillon aléatoire des
   recommandations). Dédoublonnage étendu au **titre normalisé** (même œuvre sous
   plusieurs ids TMDb selon la plateforme).
+- **Explorer : filtres par catégorie** TOUT / SÉRIES / FILMS / ANIMÉS (animé = animation
+  TMDb d'origine japonaise, étiquetée côté serveur) + **bouton ↻** — indispensable sur le
+  web où le geste « tirer pour rafraîchir » n'existe pas. Pool de tendances élargi à 18.
 - **Coche épisode instantanée** : mises à jour optimistes TanStack Query sur épisode
   vu/non-vu et « tout marquer vu » (rollback si l'API échoue).
 - **Sondage de la fiche série** : choix multiples.
