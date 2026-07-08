@@ -51,8 +51,11 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
         include: { items: { include: { media: true }, orderBy: { position: 'asc' }, take: 4 } },
         orderBy: { updatedAt: 'desc' },
       }),
+      // Sections « Séries »/« Films » du profil : la bibliothèque suivie/vue.
+      // On EXCLUT les éléments seulement « à regarder plus tard » (status
+      // 'watchlist') : ils vivent dans l'onglet « À voir », pas dans le profil.
       prisma.userMediaStatus.findMany({
-        where: { userId: request.userId, media: { type: 'show' }, isHidden: false },
+        where: { userId: request.userId, media: { type: 'show' }, isHidden: false, status: { not: 'watchlist' } },
         include: { media: true },
         orderBy: { lastWatchedAt: 'desc' },
         take: 12,
@@ -63,7 +66,7 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
         take: 12,
       }),
       prisma.userMediaStatus.findMany({
-        where: { userId: request.userId, media: { type: 'movie' }, isHidden: false },
+        where: { userId: request.userId, media: { type: 'movie' }, isHidden: false, status: { not: 'watchlist' } },
         include: { media: true },
         orderBy: { lastWatchedAt: 'desc' },
         take: 12,
