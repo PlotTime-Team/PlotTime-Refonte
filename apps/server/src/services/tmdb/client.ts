@@ -62,6 +62,8 @@ export type TmdbSearchResult = {
   popularity?: number;
   vote_average?: number;
   genre_ids?: number[];
+  original_language?: string;
+  origin_country?: string[];
 };
 
 export async function tmdbSearch(
@@ -200,8 +202,30 @@ export async function tmdbRecommendations(type: 'tv' | 'movie', tmdbId: string):
   return data?.results ?? [];
 }
 
-export async function tmdbTrending(type: 'tv' | 'movie'): Promise<TmdbSearchResult[]> {
-  const data = await cachedFetch<{ results: TmdbSearchResult[] }>(`/trending/${type}/week`, {}, 1 * DAY);
+export async function tmdbTrending(type: 'tv' | 'movie', page = 1): Promise<TmdbSearchResult[]> {
+  const data = await cachedFetch<{ results: TmdbSearchResult[] }>(
+    `/trending/${type}/week`,
+    page > 1 ? { page: String(page) } : {},
+    1 * DAY,
+  );
+  return data?.results ?? [];
+}
+
+// Découverte ciblée : sert à remplir chaque catégorie du flux Explorer (ex. les
+// animés, quasi absents des « tendances »). `genres` = ids TMDb, `language` =
+// langue d'origine (ex. 'ja' pour l'anime japonais).
+export async function tmdbDiscover(
+  type: 'tv' | 'movie',
+  opts: { genres?: number[]; language?: string; page?: number } = {},
+): Promise<TmdbSearchResult[]> {
+  const params: Record<string, string> = {
+    sort_by: 'popularity.desc',
+    page: String(opts.page ?? 1),
+    'vote_count.gte': '20',
+  };
+  if (opts.genres?.length) params.with_genres = opts.genres.join(',');
+  if (opts.language) params.with_original_language = opts.language;
+  const data = await cachedFetch<{ results: TmdbSearchResult[] }>(`/discover/${type}`, params, 1 * DAY);
   return data?.results ?? [];
 }
 

@@ -17,7 +17,20 @@ type SearchResult = {
   backdropPath: string | null;
   overview: string | null;
   inLibrary: boolean;
+  // Catégorie du flux Explorer (filtre côté app) — absent des résultats de recherche.
+  category?: 'serie' | 'film' | 'anime';
 };
+
+// Animé = animation (genre TMDb 16) d'origine japonaise.
+function feedCategory(
+  r: { genre_ids?: number[]; original_language?: string; origin_country?: string[] },
+  type: 'show' | 'movie',
+): 'serie' | 'film' | 'anime' {
+  const anime =
+    (r.genre_ids ?? []).includes(16) &&
+    (r.original_language === 'ja' || (r.origin_country ?? []).includes('JP'));
+  return anime ? 'anime' : type === 'show' ? 'serie' : 'film';
+}
 
 export async function searchRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
@@ -180,7 +193,9 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       for (const status of watching) {
         if (!status.media.tmdbId) continue;
         const recs = await tmdbRecommendations(status.media.type === 'show' ? 'tv' : 'movie', status.media.tmdbId);
-        for (const r of recs.slice(0, 3)) {
+        // Échantillon aléatoire : le tirage change à chaque rafraîchissement du flux.
+        const picks = [...recs].sort(() => Math.random() - 0.5).slice(0, 3);
+        for (const r of picks) {
           const recType = status.media.type === 'show' ? 'show' : 'movie';
           const recTitle = r.name ?? r.title ?? '';
           const recYear = (r.first_air_date ?? r.release_date)
@@ -192,6 +207,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
             tmdbId: String(r.id),
             tvdbId: null,
             type: recType,
+            category: feedCategory(r, recType),
             title: recTitle,
             year: recYear,
             posterPath: r.poster_path ?? null,
@@ -201,8 +217,25 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
           });
         }
       }
-      const [tv, movies] = await Promise.all([tmdbTrending('tv'), tmdbTrending('movie')]);
-      for (const r of [...tv.slice(0, 6), ...movies.slice(0, 6)]) {
+      // Page tirée au hasard : le pull-to-refresh / bouton ↻ renouvelle le flux.
+      const page = 1 + Math.floor(Math.random() * 3);
+      // Chaque catégorie a son propre vivier pour rester fournie (≥15-20) même
+      // filtrée : tendances séries + tendances films + découverte séries + films +
+      // un vivier ANIMÉ dédié (genre animation d'origine japonaise, quasi absent
+      // des tendances). Sans ce vivier, filtrer « Animés » ne laissait que ~3 cartes.
+      const { tmdbDiscover } = await import('../../services/tmdb/index.js');
+      const [tv, movies, discTv, discMovies, animeTv, animeMovies] = await Promise.all([
+        tmdbTrending('tv', page),
+        tmdbTrending('movie', page),
+        tmdbDiscover('tv', { page }),
+        tmdbDiscover('movie', { page }),
+        tmdbDiscover('tv', { genres: [16], language: 'ja', page }),
+        tmdbDiscover('movie', { genres: [16], language: 'ja', page }),
+      ]);
+      const pool = [...tv, ...movies, ...discTv, ...discMovies, ...animeTv, ...animeMovies].sort(
+        () => Math.random() - 0.5,
+      );
+      for (const r of pool) {
         const trendType = r.title ? 'movie' : 'show';
         const trendTitle = r.name ?? r.title ?? '';
         const trendYear = (r.first_air_date ?? r.release_date)
@@ -214,6 +247,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
           tmdbId: String(r.id),
           tvdbId: null,
           type: trendType,
+          category: feedCategory(r, trendType),
           title: trendTitle,
           year: trendYear,
           posterPath: r.poster_path ?? null,
@@ -223,12 +257,24 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
         });
       }
     }
-    // Déduplique en conservant l'ordre.
+    // Déduplique en conservant l'ordre — par id TMDb ET par titre normalisé
+    // (la même œuvre peut exister sous plusieurs ids selon la plateforme).
     const seen = new Set<string>();
-    const feed = cards.filter((c) => {
-      const key = `${c.type}:${c.tmdbId}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
+    const deduped = cards.filter((c) => {
+      const keys = [`${c.type}:${c.tmdbId}`, `${c.type}:${norm(c.title)}`];
+      if (keys.some((k) => seen.has(k))) return false;
+      keys.forEach((k) => seen.add(k));
+      return true;
+    });
+    // Plafond équilibré : au plus PER_CAT items par catégorie (serie/film/anime),
+    // pour que chaque filtre de l'app reste fourni sans renvoyer une liste énorme.
+    const PER_CAT = 22;
+    const perCat = new Map<string, number>();
+    const feed = deduped.filter((c) => {
+      const cat = c.category ?? (c.type === 'show' ? 'serie' : 'film');
+      const n = perCat.get(cat) ?? 0;
+      if (n >= PER_CAT) return false;
+      perCat.set(cat, n + 1);
       return true;
     });
     return { feed };

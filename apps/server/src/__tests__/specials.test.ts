@@ -93,7 +93,7 @@ describe('Épisodes spéciaux (façon TV Time)', () => {
     // On coche d'abord un spécial à la main.
     const eps0 = await app.inject({ method: 'GET', url: `/api/shows/${mediaId}/episodes`, headers: auth() });
     const specialEp = (eps0.json().seasons as { seasonNumber: number; episodes: { id: string }[] }[])
-      .find((s) => s.seasonNumber === 0)!.episodes[0].id;
+      .find((s) => s.seasonNumber === 0)!.episodes[0]!.id;
     await app.inject({ method: 'POST', url: `/api/episodes/${specialEp}/watched`, headers: auth() });
 
     const res = await app.inject({ method: 'POST', url: `/api/shows/${mediaId}/mark-all-unwatched`, headers: auth() });

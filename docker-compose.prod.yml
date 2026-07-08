@@ -1,0 +1,21 @@
+services:
+  serietime-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: serietime-server
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - ./apps/server/data:/app/apps/server/data
+    env_file:
+      - .env
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: "1.0"
+    # Rotation des logs : borne l'espace disque (sinon json-file grandit sans fin).
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

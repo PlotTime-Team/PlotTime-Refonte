@@ -86,6 +86,25 @@ export function EmptyState({ title, message }: { title: string; message?: string
   );
 }
 
+// Échec de chargement (réseau coupé, web app réveillée par iOS, erreur serveur) :
+// message clair + bouton réessayer, au lieu d'un spinner infini ou d'un faux « vide ».
+export function LoadError({ onRetry, busy }: { onRetry: () => void; busy?: boolean }) {
+  return (
+    <View style={styles.empty}>
+      <Feather name="wifi-off" size={40} color={COLORS.textMuted} />
+      <Text style={[styles.emptyTitle, { marginTop: 14 }]}>Impossible de charger</Text>
+      <Text style={styles.emptyMsg}>Vérifie ta connexion, puis réessaie.</Text>
+      <Pressable onPress={onRetry} disabled={busy} style={styles.retryBtn} hitSlop={6}>
+        {busy ? (
+          <ActivityIndicator size="small" color={COLORS.black} />
+        ) : (
+          <Text style={styles.retryText}>RÉESSAYER</Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
 export function Loading() {
   return (
     <View style={styles.loading}>
@@ -142,6 +161,8 @@ export const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 30 },
   emptyTitle: { fontSize: 20, fontFamily: FONTS.extraBold, textAlign: 'center' },
   emptyMsg: { fontFamily: FONTS.regular, fontSize: 15, color: COLORS.textMuted, marginTop: 8, textAlign: 'center' },
+  retryBtn: { borderWidth: 2, borderColor: COLORS.black, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 28, marginTop: 16 },
+  retryText: { fontSize: 14, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
   loading: { paddingVertical: 60, alignItems: 'center' },
   topTabs: { flexDirection: 'row', height: 56, backgroundColor: COLORS.white },
   topTab: { flex: 1, alignItems: 'center', justifyContent: 'center' },

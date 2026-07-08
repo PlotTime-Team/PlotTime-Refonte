@@ -48,24 +48,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 ## Prochaines étapes (par priorité)
 
-0. **Retours d'usage de Benjamin (08/07, première vraie session sur l'app)** :
-   - **Explorer : pull-to-refresh** pour renouveler les recommandations (ajouter un
-     `RefreshControl` + varier les résultats côté serveur : mélange ou pagination
-     TMDb, aujourd'hui le même flux revient à l'identique).
-   - **Fiche série, sondage « Qu'est-ce qui vous intéresse le plus ? »** : permettre
-     plusieurs choix (aujourd'hui une seule réponse possible).
-   - **Coche épisode : latence** — l'app attend la réponse serveur avant d'afficher
-     la coche. Passer en mise à jour optimiste (cocher tout de suite, revenir en
-     arrière si l'API échoue), via TanStack Query.
-   - **Titres longs qui débordent** sur les cartes de saisons/arcs (ex. « Arc
-     Reverse Mountain / Whisky Peak » sur One Piece) : tronquer (`numberOfLines`).
-   - **Vignettes d'épisodes manquantes** (placeholder gris) pour les séries ajoutées
-     via TheTVDB : récupérer les images d'épisodes à l'ajout ou à la volée.
-   - **Épisodes futurs** : les afficher avec image + badge « À venir » + date de
-     diffusion (liste des épisodes ET onglet « À VENIR », qui n'a aucune image).
-1. **UX connexion web app** : rediriger vers l'écran de connexion sur réponse 401 (aujourd'hui : « aucun résultat » / spinner infini quand la session manque) ; ajouter les metas PWA à l'export web (apple-touch-icon, titre, plein écran).
-2. **`expo.extra.serverUrl`** : décider comment baker l'URL de prod sans casser le dev local d'Étienne (ex. `app.config.js` + variable d'env) — pour l'instant l'URL est bakée uniquement dans le build web déployé.
-3. Option « Ne plus suivre » / gestion fine depuis les listes du profil (l'API existe : `DELETE /api/shows/:id/tracking`).
+1. Option « Ne plus suivre » / gestion fine depuis les listes du profil (l'API existe : `DELETE /api/shows/:id/tracking`).
 4. Notifications push (quand on passera au dev build Expo).
 5. SSO Google/Facebook (ids OAuth à créer, dev build requis).
 6. Publication native optionnelle (EAS Build APK, puis stores).
@@ -92,6 +75,64 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
     saison 0, série « terminée » sans les spéciaux). **77 tests** (25 core + 52 serveur).
   - Seed de démo enrichi (Mushoku Tensei : 3 saisons + spéciaux, S1/S2 terminées,
     S3 en cours) pour vérifier visuellement barres et tri.
+
+### 2026-07-08 (après-midi) — Claude (avec Benjamin) — Audit vagues 1 & 2
+Suite au `docs/AUDIT-2026-07-08.md`. Branche synchronisée avec le travail d'Étienne
+(police Rubik) au préalable.
+**Sécurité serveur** : rate limiting `@fastify/rate-limit` sur login (10/5 min) et
+register (10/10 min) ; mdp min 8, purge des sessions expirées, invalidation des autres
+sessions au changement de mdp ; borne anti zip-bomb (volume décompressé total + nb
+d'entrées) ; imports TV Time scopés par `userId` (migration `import_user_scope`) ;
+`backup/import` durci (catalogue partagé en create-only, tables perso via updateMany
+scopé, export sans `passwordHash`) ; avatars/couvertures bornés.
+**Robustesse mobile** : `LoadError` partagé (message + RÉESSAYER) sur profil, fiche
+série, épisodes, films, notifications, social, profil public — fini les spinners
+infinis / faux « vide ». Coche optimiste depuis « À VOIR ». « Partager » via Web Share
+API sur la web app. Notif → film ouvre la bonne fiche (`mediaType` en métadonnées).
+**Explorer** : viviers dédiés par catégorie (tendances + découverte + vivier animé
+genre 16/ja) et plafond équilibré ~22/catégorie → « Animés » passe de 3 à ~20 items.
+Barre catégories + ↻ collante ; cartes du flux cochées après ajout (lots précédents).
+**Réglages compte** : suppression de compte réelle (route `DELETE /api/auth/account` +
+modale de confirmation), changement de mdp, export JSON ; retrait des boutons morts.
+Profil : carte « temps films » ajoutée.
+**Infra** : rotation des logs Docker, cache Nginx 1 an sur `/_expo/`, cron healthcheck
+(relance si KO), CI proposée (`docs/proposed-ci-workflow.yml`).
+Typecheck mobile + serveur, 74 tests verts. Déployé et vérifié en prod.
+
+### 2026-07-08 (matin) — Claude (avec Benjamin)
+Retours d'usage de la première vraie session + finitions web app :
+- **Explorer : pull-to-refresh** (`RefreshControl`) et **flux renouvelé à chaque tirage**
+  côté serveur (page de tendances TMDb aléatoire + mélange + échantillon aléatoire des
+  recommandations). Dédoublonnage étendu au **titre normalisé** (même œuvre sous
+  plusieurs ids TMDb selon la plateforme).
+- **Explorer : filtres par catégorie** TOUT / SÉRIES / FILMS / ANIMÉS (animé = animation
+  TMDb d'origine japonaise, étiquetée côté serveur) + **bouton ↻** — indispensable sur le
+  web où le geste « tirer pour rafraîchir » n'existe pas. Pool de tendances élargi à 18.
+- **« À VOIR » / « À VENIR » : écran d'erreur dédié** (« Impossible de charger » +
+  RÉESSAYER) quand la requête échoue — iOS suspend le réseau de la web app au réveil et
+  l'échec s'affichait comme un faux « aucun épisode à venir ». Le 401 ne purge plus la
+  session quand aucun jeton n'avait été envoyé (course à la réhydratation du store).
+- **Coche épisode instantanée** : mises à jour optimistes TanStack Query sur épisode
+  vu/non-vu et « tout marquer vu » (rollback si l'API échoue).
+- **Sondage de la fiche série** : choix multiples.
+- **Titres de saisons/arcs tronqués** (`numberOfLines`) — plus de débordement sur
+  One Piece.
+- **Vignettes d'épisodes** : repli sur l'affiche de la série quand l'épisode n'a pas
+  encore d'image (épisodes non diffusés) + **badge « À VENIR · date »** dans la liste
+  des épisodes ; l'onglet « À VENIR » affiche désormais les images (la carte ignorait
+  l'image même quand elle existait).
+- **Session absente/expirée (401)** : déconnexion + redirection automatique vers l'écran
+  de connexion (fini les écrans « aucun résultat » de la web app épinglée) + garde sur
+  le groupe d'onglets. Au passage, les erreurs de connexion affichent à nouveau le bon
+  message (« E-mail ou mot de passe incorrect ») au lieu de « Connexion impossible ».
+- **Web app** : `app/+html.tsx` (metas iOS : icône d'écran d'accueil, titre, plein
+  écran, `theme-color`), `public/apple-touch-icon.png`, export **statique**
+  (`web.output: "static"`) ; le store persiste via un stockage inerte pendant le rendu
+  statique (l'export plantait sur AsyncStorage sans `window`).
+- **Config de déploiement** : `mobile/app.config.js` — l'URL du serveur se bake via
+  `SERIETIME_SERVER_URL` au moment de l'export, `app.json` reste vierge (le dev local
+  d'Étienne garde l'écran « URL du serveur ») ; `docker-compose.prod.yml` versionné.
+- Typecheck mobile + serveur verts, 74 tests verts.
 
 ### 2026-07-08 — Claude (2)
 - **Police Rubik** partout (native + web) : la plus proche de la géométrique

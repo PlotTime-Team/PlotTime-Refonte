@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import { COLORS, FONTS } from '@/lib/theme';
-import { Loading } from '@/components/ui';
+import { Loading, LoadError } from '@/components/ui';
 
 type RecentShow = { id: string; title: string; posterPath: string | null; type: string };
 type UserProfile = {
@@ -30,7 +30,7 @@ export default function UserProfileScreen() {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['user', id],
     queryFn: () => api.get<UserProfile>(`/api/users/${id}`),
   });
@@ -48,7 +48,8 @@ export default function UserProfileScreen() {
     }
   };
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (!data) return <LoadError onRetry={refetch} busy={isRefetching} />;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: COLORS.white }} contentContainerStyle={{ paddingBottom: 24 }}>

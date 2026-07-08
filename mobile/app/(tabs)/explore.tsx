@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, Keyboard } from 'react-native';
+import { View, Text, TextInput, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, Keyboard, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ type FeedItem = {
   tmdbId: string | null;
   tvdbId: string | null;
   type: 'show' | 'movie';
+  category?: 'serie' | 'film' | 'anime';
   title: string;
   year: number | null;
   posterPath: string | null;
@@ -21,6 +22,14 @@ type FeedItem = {
   overview: string | null;
   inLibrary: boolean;
 };
+
+type FeedCategory = 'tout' | 'serie' | 'film' | 'anime';
+const FEED_CATEGORIES: { key: FeedCategory; label: string }[] = [
+  { key: 'tout', label: 'TOUT' },
+  { key: 'serie', label: 'SÉRIES' },
+  { key: 'film', label: 'FILMS' },
+  { key: 'anime', label: 'ANIMÉS' },
+];
 
 type PublicUser = { id: string; displayName: string; avatarUrl: string | null; isFollowing?: boolean };
 
@@ -32,7 +41,7 @@ export default function ExploreScreen() {
   const [tab, setTab] = useState<'media' | 'users'>('media');
   // Debounce : une requête quand l'utilisateur marque une pause, pas à chaque frappe.
   const debouncedQuery = useDebounced(query.trim(), 300);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['explore', 'feed'],
     queryFn: () => api.get<{ feed: FeedItem[] }>('/api/explore/feed'),
     staleTime: 30 * 60_000,
@@ -73,7 +82,7 @@ export default function ExploreScreen() {
           {tab === 'media' ? <MediaResults query={debouncedQuery} rawQuery={query} /> : <UserResults query={debouncedQuery} />}
         </>
       ) : (
-        <Feed items={data?.feed} loading={isLoading} />
+        <Feed items={data?.feed} loading={isLoading} refreshing={isRefetching} onRefresh={refetch} />
       )}
     </View>
   );
@@ -274,10 +283,23 @@ function UserResults({ query }: { query: string }) {
   );
 }
 
-function Feed({ items, loading }: { items?: FeedItem[]; loading: boolean }) {
+function Feed({
+  items,
+  loading,
+  refreshing,
+  onRefresh,
+}: {
+  items?: FeedItem[];
+  loading: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [addingKey, setAddingKey] = useState<string | null>(null);
+  const [cat, setCat] = useState<FeedCategory>('tout');
+  // Éléments ajoutés depuis ce tirage : la carte passe en ✓ (persiste au retour de la fiche).
+  const [followed, setFollowed] = useState<Record<string, boolean>>({});
 
   // Ajoute la recommandation à la bibliothèque puis ouvre sa fiche.
   const add = async (f: FeedItem, key: string) => {
@@ -286,6 +308,7 @@ function Feed({ items, loading }: { items?: FeedItem[]; loading: boolean }) {
     try {
       const path = f.type === 'movie' ? '/api/movies/add-from-tmdb' : '/api/shows/add-from-tmdb';
       const res = await api.post<{ mediaId: string }>(path, { tmdbId: f.tmdbId });
+      setFollowed((prev) => ({ ...prev, [key]: true }));
       queryClient.invalidateQueries({ queryKey: ['shows'] });
       queryClient.invalidateQueries({ queryKey: ['movies'] });
       router.push(`/show/${res.mediaId}${f.type === 'movie' ? '?type=movie' : ''}`);
@@ -295,16 +318,47 @@ function Feed({ items, loading }: { items?: FeedItem[]; loading: boolean }) {
   };
 
   if (loading) return <Loading />;
+  // Tirer vers le bas rafraîchit le flux (natif). Sur le web ce geste n'existe
+  // pas : le bouton ↻ fait la même chose.
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
   if (!items || items.length === 0)
     return (
-      <EmptyState
-        title="Pas encore de recommandations"
-        message="Configurez une clé TMDb sur le serveur et suivez des séries pour alimenter votre flux."
-      />
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} refreshControl={refreshControl}>
+        <EmptyState
+          title="Pas encore de recommandations"
+          message="Configurez une clé TMDb sur le serveur et suivez des séries pour alimenter votre flux."
+        />
+      </ScrollView>
     );
+  const catOf = (f: FeedItem) => f.category ?? (f.type === 'show' ? 'serie' : 'film');
+  const filtered = cat === 'tout' ? items : items.filter((f) => catOf(f) === cat);
   return (
-    <ScrollView contentContainerStyle={{ paddingVertical: 8, paddingBottom: 24 }}>
-      {items.map((f, i) => {
+    <ScrollView
+      contentContainerStyle={{ paddingBottom: 24 }}
+      refreshControl={refreshControl}
+      // La rangée catégories + ↻ reste visible pendant le défilement.
+      stickyHeaderIndices={[0]}
+    >
+      <View style={styles.feedHead}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0, flexShrink: 1 }}>
+          {FEED_CATEGORIES.map((c) => (
+            <Pressable key={c.key} style={[styles.catChip, cat === c.key && styles.catChipSel]} onPress={() => setCat(c.key)}>
+              <Text style={[styles.catChipText, cat === c.key && styles.catChipTextSel]}>{c.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        <Pressable style={styles.refreshBtn} onPress={onRefresh} disabled={refreshing} hitSlop={6}>
+          {refreshing ? (
+            <ActivityIndicator size="small" color={COLORS.black} />
+          ) : (
+            <Feather name="refresh-cw" size={17} color={COLORS.black} />
+          )}
+        </Pressable>
+      </View>
+      {filtered.length === 0 ? (
+        <EmptyState title="Rien dans cette catégorie" message="Actualise (bouton ↻) pour un nouveau tirage." />
+      ) : null}
+      {filtered.map((f, i) => {
         const key = `${f.type}-${f.tmdbId}`;
         const image = tmdbImage(f.backdropPath, 'w780') ?? tmdbImage(f.posterPath, 'w500');
         return (
@@ -312,13 +366,19 @@ function Feed({ items, loading }: { items?: FeedItem[]; loading: boolean }) {
             <View style={styles.heroImg}>
               {image ? <Image source={{ uri: image }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
               <View style={styles.heroShade} />
-              <Pressable style={styles.plus} onPress={() => add(f, key)}>
-                {addingKey === key ? (
-                  <ActivityIndicator color={COLORS.yellow} />
-                ) : (
-                  <Feather name="plus" size={26} color={COLORS.yellow} />
-                )}
-              </Pressable>
+              {followed[key] || f.inLibrary ? (
+                <View style={styles.plus}>
+                  <Feather name="check" size={26} color={COLORS.yellow} />
+                </View>
+              ) : (
+                <Pressable style={styles.plus} onPress={() => add(f, key)}>
+                  {addingKey === key ? (
+                    <ActivityIndicator color={COLORS.yellow} />
+                  ) : (
+                    <Feather name="plus" size={26} color={COLORS.yellow} />
+                  )}
+                </Pressable>
+              )}
               <View style={styles.heroCap}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Feather name={f.type === 'show' ? 'tv' : 'film'} size={22} color="#fff" />
@@ -340,6 +400,12 @@ function Feed({ items, loading }: { items?: FeedItem[]; loading: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  feedHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 10, backgroundColor: COLORS.white },
+  catChip: { backgroundColor: COLORS.chipGrey, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  catChipSel: { backgroundColor: COLORS.yellow },
+  catChipText: { fontSize: 13, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 0.4 },
+  catChipTextSel: { color: COLORS.black },
+  refreshBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: COLORS.black, alignItems: 'center', justifyContent: 'center', marginLeft: 'auto' },
   searchbar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, height: 70 },
   input: { flex: 1, fontFamily: FONTS.regular, fontSize: 19, borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingVertical: 8 },
   cancel: { color: COLORS.blue, fontFamily: FONTS.regular, fontSize: 17 },

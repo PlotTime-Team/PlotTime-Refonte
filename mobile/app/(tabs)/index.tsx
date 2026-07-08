@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, tmdbImage } from '@/lib/api';
 import type { QueueItemDto, UpcomingItemDto } from '@/lib/types';
 import { queueGroupLabel, episodeCode, timeHHMM } from '@/lib/format';
 import { COLORS, RADIUS, SHADOW, FONTS } from '@/lib/theme';
-import { PillHeader, TopTabs, EmptyState, Loading, ShowPill, Badge, CheckCircle } from '@/components/ui';
+import { PillHeader, TopTabs, EmptyState, Loading, LoadError, ShowPill, Badge, CheckCircle } from '@/components/ui';
 import { EpisodeQueueCard } from '@/components/EpisodeQueueCard';
 
 export default function ShowsScreen() {
@@ -26,12 +26,27 @@ export default function ShowsScreen() {
 
 function QueueView() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['shows', 'queue'],
     queryFn: () => api.get<{ items: QueueItemDto[] }>('/api/shows/queue'),
   });
+  // Marquer l'épisode « à voir » comme vu : mise à jour optimiste — la carte
+  // disparaît (ou avance) immédiatement, l'appel réseau suit (rollback si échec).
   const mark = useMutation({
     mutationFn: (episodeId: string) => api.post(`/api/episodes/${episodeId}/watched`),
+    onMutate: async (episodeId: string) => {
+      await qc.cancelQueries({ queryKey: ['shows', 'queue'] });
+      const prev = qc.getQueryData<{ items: QueueItemDto[] }>(['shows', 'queue']);
+      if (prev) {
+        qc.setQueryData<{ items: QueueItemDto[] }>(['shows', 'queue'], {
+          items: prev.items.filter((it) => it.nextEpisode?.id !== episodeId),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e: unknown, _id: string, ctx?: { prev?: { items: QueueItemDto[] } }) => {
+      if (ctx?.prev) qc.setQueryData(['shows', 'queue'], ctx.prev);
+    },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['shows'] });
       qc.invalidateQueries({ queryKey: ['profile'] });
@@ -39,6 +54,7 @@ function QueueView() {
   });
 
   if (isLoading) return <Loading />;
+  if (isError && !data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   if (!data || data.items.length === 0)
     return (
       <EmptyState
@@ -69,11 +85,12 @@ function QueueView() {
 }
 
 function UpcomingView() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['shows', 'upcoming'],
     queryFn: () => api.get<{ groups: { label: string; items: UpcomingItemDto[] }[] }>('/api/shows/upcoming'),
   });
   if (isLoading) return <Loading />;
+  if (isError && !data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   if (!data || data.groups.length === 0)
     return <EmptyState title="Aucun épisode à venir" message="Les prochaines diffusions apparaîtront ici." />;
 
@@ -96,11 +113,17 @@ function UpcomingCard({ item }: { item: UpcomingItemDto }) {
   const ep = item.episodes[0];
   if (!ep) return null;
   const isPremiere = ep.seasonNumber >= 1 && ep.episodeNumber === 1;
+  // Vignette : image de l'épisode si déjà publiée, sinon affiche de la série.
+  const thumbUri = tmdbImage(ep.stillPath, 'w300') ?? tmdbImage(item.media.posterPath, 'w342');
   return (
     <Pressable style={styles.upcard} onPress={() => router.push(`/show/${item.media.id}`)}>
-      <View style={styles.thumb}>
-        <Feather name="image" size={28} color="#9a9a9a" />
-      </View>
+      {thumbUri ? (
+        <Image source={{ uri: thumbUri }} style={styles.thumb} resizeMode="cover" />
+      ) : (
+        <View style={styles.thumb}>
+          <Feather name="image" size={28} color="#9a9a9a" />
+        </View>
+      )}
       <View style={styles.body}>
         <View style={styles.topRow}>
           <ShowPill label={item.media.title} onPress={() => router.push(`/show/${item.media.id}`)} />
