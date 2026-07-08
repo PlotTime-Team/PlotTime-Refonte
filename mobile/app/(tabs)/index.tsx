@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,9 +24,34 @@ export default function ShowsScreen() {
   );
 }
 
+// Échec de chargement (réseau coupé, web app tout juste réveillée par iOS...) :
+// un message clair + réessayer, au lieu d'un faux « rien à afficher ».
+function LoadError({ onRetry, busy }: { onRetry: () => void; busy: boolean }) {
+  return (
+    <View style={{ alignItems: 'center', paddingTop: 80, paddingHorizontal: 32, gap: 14 }}>
+      <Feather name="wifi-off" size={40} color={COLORS.textMuted} />
+      <Text style={{ fontSize: 20, fontWeight: '800', textAlign: 'center' }}>Impossible de charger</Text>
+      <Text style={{ fontSize: 15, color: COLORS.textMuted, textAlign: 'center' }}>
+        Vérifie ta connexion, puis réessaie.
+      </Text>
+      <Pressable
+        onPress={onRetry}
+        disabled={busy}
+        style={{ borderWidth: 2, borderColor: COLORS.black, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 28, marginTop: 4 }}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={COLORS.black} />
+        ) : (
+          <Text style={{ fontSize: 14, fontWeight: '800', letterSpacing: 0.5 }}>RÉESSAYER</Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
 function QueueView() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['shows', 'queue'],
     queryFn: () => api.get<{ items: QueueItemDto[] }>('/api/shows/queue'),
   });
@@ -39,6 +64,7 @@ function QueueView() {
   });
 
   if (isLoading) return <Loading />;
+  if (isError && !data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   if (!data || data.items.length === 0)
     return (
       <EmptyState
@@ -69,11 +95,12 @@ function QueueView() {
 }
 
 function UpcomingView() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['shows', 'upcoming'],
     queryFn: () => api.get<{ groups: { label: string; items: UpcomingItemDto[] }[] }>('/api/shows/upcoming'),
   });
   if (isLoading) return <Loading />;
+  if (isError && !data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   if (!data || data.groups.length === 0)
     return <EmptyState title="Aucun épisode à venir" message="Les prochaines diffusions apparaîtront ici." />;
 

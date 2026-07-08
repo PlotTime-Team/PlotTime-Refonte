@@ -66,6 +66,10 @@ Retours d'usage de la première vraie session + finitions web app :
 - **Explorer : filtres par catégorie** TOUT / SÉRIES / FILMS / ANIMÉS (animé = animation
   TMDb d'origine japonaise, étiquetée côté serveur) + **bouton ↻** — indispensable sur le
   web où le geste « tirer pour rafraîchir » n'existe pas. Pool de tendances élargi à 18.
+- **« À VOIR » / « À VENIR » : écran d'erreur dédié** (« Impossible de charger » +
+  RÉESSAYER) quand la requête échoue — iOS suspend le réseau de la web app au réveil et
+  l'échec s'affichait comme un faux « aucun épisode à venir ». Le 401 ne purge plus la
+  session quand aucun jeton n'avait été envoyé (course à la réhydratation du store).
 - **Coche épisode instantanée** : mises à jour optimistes TanStack Query sur épisode
   vu/non-vu et « tout marquer vu » (rollback si l'API échoue).
 - **Sondage de la fiche série** : choix multiples.

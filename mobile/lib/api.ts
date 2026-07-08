@@ -31,10 +31,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   const data = await res.json().catch(() => null);
   if (res.status === 401) {
-    // Session absente ou expirée (hors écrans d'authentification, où le 401 est
-    // une réponse normale) : déconnexion + retour à l'écran de connexion, au lieu
-    // de laisser des écrans vides « aucun résultat ».
-    if (!path.startsWith('/api/auth/')) {
+    // Session expirée (hors écrans d'authentification, où le 401 est une réponse
+    // normale) : déconnexion + retour à l'écran de connexion, au lieu de laisser
+    // des écrans vides « aucun résultat ». Seulement si un jeton avait bien été
+    // envoyé : sinon (store pas encore réhydraté), on laisse la garde des onglets
+    // gérer sans effacer la session.
+    if (token && !path.startsWith('/api/auth/')) {
       useAppStore.getState().logout();
       router.replace('/setup');
     }
