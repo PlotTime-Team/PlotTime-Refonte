@@ -66,6 +66,26 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
 
+### 2026-07-08 — Claude (7)
+- **« Personnaliser » copié de TV Time** (séries ET films, réf. 38-40) : le
+  menu « … » → Personnaliser ouvre un petit sheet « Modifier l'affiche /
+  Changer la bannière » ; chaque option ouvre un écran plein (retour + titre
+  centré) — affiches en grille 2 colonnes, bannières en liste ; l'image active
+  est assombrie avec **★ « Sélectionnée »** (fini le liseré jaune + coche).
+- **Onglet Épisodes recalé sur TV Time (réf. PJ Mushoku)** :
+  - **Coches TOUJOURS vertes** (défaut global de `CheckCircle` : vert + coche
+    blanche) — le jaune est réservé aux barres de progression.
+  - **Progression basée sur les épisodes DIFFUSÉS** : saison « terminée »
+    (barre + coche vertes) quand tous les épisodes disponibles à date sont vus ;
+    barre jaune sinon, **piste jaune pâle toujours visible** (réf. 35).
+  - **Barre de progression globale de la série** au bas de la bannière
+    (épisodes diffusés vus / diffusés, hors spéciaux) : jaune en cours, verte à
+    jour.
+  - **Épisodes non diffusés : plus de coche** (verrou serveur `400
+    not_aired_yet` ajouté) ; à la place, **compte à rebours « N JOURS »**
+    (nombre 24 extraBold + libellé 10) au lieu de la date.
+  - Tests : verrou non-diffusé couvert (**79 tests** : 25 + 54).
+
 ### 2026-07-08 — Claude (6)
 - **Onglet Séries : « Historique de visionnage » façon TV Time** — la liste
   « À voir » s'ouvre normalement, et **faire défiler vers le haut révèle les

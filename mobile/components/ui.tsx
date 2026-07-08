@@ -34,14 +34,14 @@ export function CheckCircle({
   checked,
   onPress,
   size = 52,
-  checkedBg = COLORS.yellow,
-  checkedFg = COLORS.black,
+  checkedBg = COLORS.green,
+  checkedFg = COLORS.white,
 }: {
   checked?: boolean;
   onPress?: () => void;
   size?: number;
-  // Couleurs de l'état coché : par défaut jaune façon TV Time, mais les
-  // saisons terminées passent en vert (fond vert, coche blanche).
+  // État coché : TOUJOURS vert à coche blanche (règle TV Time — le jaune est
+  // réservé aux barres de progression en cours, jamais aux coches).
   checkedBg?: string;
   checkedFg?: string;
 }) {

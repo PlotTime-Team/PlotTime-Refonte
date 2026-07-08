@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import type { EpisodeDto, MediaDto } from '@/lib/types';
-import { episodeCode, shortDateFr } from '@/lib/format';
+import { episodeCode } from '@/lib/format';
 import { COLORS, RADIUS, SHADOW, FONTS } from '@/lib/theme';
 import { TopTabs, CheckCircle, Loading, LoadError, EmptyState } from '@/components/ui';
 
@@ -27,7 +27,8 @@ export default function ShowDetail() {
   const [interest, setInterest] = useState<string[]>([]);
   const [justAdded, setJustAdded] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [personalize, setPersonalize] = useState(false);
+  const [persoMenu, setPersoMenu] = useState(false);
+  const [artwork, setArtwork] = useState<'poster' | 'banner' | null>(null);
   const [listsOpen, setListsOpen] = useState(false);
 
   // Bandeau jaune éphémère en bas d'écran (façon « AJOUTÉE ! » de TV Time).
@@ -47,6 +48,17 @@ export default function ShowDetail() {
     qc.invalidateQueries({ queryKey: ['movies'] });
     qc.invalidateQueries({ queryKey: ['profile'] });
   };
+
+  // Progression globale de la série (même cache que l'onglet Épisodes) pour la
+  // barre au bas de la bannière — basée sur les épisodes DIFFUSÉS uniquement.
+  const episodesQ = useQuery({
+    queryKey: ['show', id, 'episodes'],
+    queryFn: () =>
+      api.get<{ seasons: { seasonNumber: number; episodes: { airDate?: string | null; watched: boolean }[] }[] }>(
+        `/api/shows/${id}/episodes`,
+      ),
+    enabled: !isMovie,
+  });
 
   const favorite = useMutation({
     mutationFn: () => api.post(`/api/${isMovie ? 'movies' : 'shows'}/${id}/favorite`),
@@ -97,6 +109,22 @@ export default function ShowDetail() {
   const media: MediaDto = detail.data.media;
   const isFollowed = media.userStatus != null;
 
+  // Barre de progression globale : épisodes diffusés vus / diffusés (hors spéciaux).
+  const heroProg = (() => {
+    if (isMovie) return null;
+    let aired = 0;
+    let watched = 0;
+    for (const s of episodesQ.data?.seasons ?? []) {
+      if (s.seasonNumber === 0) continue;
+      for (const e of s.episodes) {
+        if (isUpcoming(e.airDate)) continue;
+        aired += 1;
+        if (e.watched) watched += 1;
+      }
+    }
+    return aired > 0 ? { pct: Math.min(100, (watched / aired) * 100), complete: watched >= aired } : null;
+  })();
+
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.white }}>
       <View style={styles.hero}>
@@ -128,6 +156,17 @@ export default function ShowDetail() {
                 ].filter(Boolean).join(' · ')}
           </Text>
         </View>
+        {/* Progression globale au bas de la bannière : jaune en cours, verte à jour. */}
+        {heroProg ? (
+          <View style={styles.heroProgressTrack}>
+            <View
+              style={[
+                styles.heroProgressFill,
+                { width: `${heroProg.pct}%`, backgroundColor: heroProg.complete ? COLORS.green : COLORS.yellow },
+              ]}
+            />
+          </View>
+        ) : null}
       </View>
 
       {isMovie ? (
@@ -180,7 +219,7 @@ export default function ShowDetail() {
           <View style={styles.statusRow}>
             <Text style={styles.statusText}>{STATUS_LABELS[media.userStatus ?? 'not_started']}</Text>
           </View>
-          <SheetItem icon="edit-2" label="Personnaliser" onPress={() => { setMenu(false); setPersonalize(true); }} />
+          <SheetItem icon="edit-2" label="Personnaliser" onPress={() => { setMenu(false); setPersoMenu(true); }} />
           <SheetItem
             icon="heart"
             color={media.isFavorite ? COLORS.red : COLORS.black}
@@ -200,11 +239,16 @@ export default function ShowDetail() {
         </View>
       </Modal>
 
-      <PersonalizeSheet
+      <PersonalizeMenu
+        visible={persoMenu}
+        onClose={() => setPersoMenu(false)}
+        onPick={(m) => { setPersoMenu(false); setArtwork(m); }}
+      />
+      <ArtworkPicker
         mediaId={String(id)}
         isMovie={isMovie}
-        visible={personalize}
-        onClose={() => setPersonalize(false)}
+        mode={artwork}
+        onClose={() => setArtwork(null)}
         onApplied={(what) => { refresh(); showToast(what === 'poster' ? 'Affiche mise à jour' : 'Bannière mise à jour'); }}
       />
       <ListsSheet
@@ -226,18 +270,46 @@ function SheetItem({ icon, label, onPress, color, last }: { icon: keyof typeof F
   );
 }
 
-// « Personnaliser » : choisir l'affiche et la bannière parmi les illustrations
-// disponibles (TMDb + TheTVDB), comme le bottom sheet de TV Time.
-function PersonalizeSheet({
+// « Personnaliser » (copie TV Time) : petit bottom sheet qui propose
+// « Modifier l'affiche » et « Changer la bannière » (cf. réf. 38).
+function PersonalizeMenu({
+  visible,
+  onClose,
+  onPick,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onPick: (mode: 'poster' | 'banner') => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.overlay} onPress={onClose} />
+      <View style={styles.sheet}>
+        <Text style={pstyles.menuHeader}>Personnaliser</Text>
+        <Pressable style={pstyles.menuItem} onPress={() => onPick('poster')}>
+          <Text style={pstyles.menuItemText}>Modifier l&apos;affiche</Text>
+        </Pressable>
+        <Pressable style={pstyles.menuItem} onPress={() => onPick('banner')}>
+          <Text style={pstyles.menuItemText}>Changer la bannière</Text>
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+// Écran plein « Modifier l'affiche » / « Changer la bannière » (copie TV Time,
+// cf. réf. 39-40) : retour + titre centré, grille d'affiches sur 2 colonnes ou
+// liste de bannières ; l'image active est assombrie avec ★ « Sélectionnée ».
+function ArtworkPicker({
   mediaId,
   isMovie,
-  visible,
+  mode,
   onClose,
   onApplied,
 }: {
   mediaId: string;
   isMovie: boolean;
-  visible: boolean;
+  mode: 'poster' | 'banner' | null;
   onClose: () => void;
   onApplied: (what: 'poster' | 'banner') => void;
 }) {
@@ -249,82 +321,71 @@ function PersonalizeSheet({
       api.get<{ posters: string[]; backdrops: string[]; selectedPoster: string | null; selectedBackdrop: string | null }>(
         `/api/${base}/${mediaId}/images`,
       ),
-    enabled: visible,
+    enabled: mode !== null,
   });
 
-  const apply = async (what: 'poster' | 'banner', uri: string) => {
-    if (busyUri) return;
+  const apply = async (uri: string) => {
+    if (busyUri || !mode) return;
     setBusyUri(uri);
     try {
-      if (what === 'poster') await api.post(`/api/${base}/${mediaId}/poster`, { posterPath: uri });
+      if (mode === 'poster') await api.post(`/api/${base}/${mediaId}/poster`, { posterPath: uri });
       else await api.post(`/api/${base}/${mediaId}/banner`, { backdropPath: uri });
       images.refetch();
-      onApplied(what);
+      onApplied(mode);
     } finally {
       setBusyUri(null);
     }
   };
 
+  const isPoster = mode === 'poster';
+  const list = (isPoster ? images.data?.posters : images.data?.backdrops) ?? [];
+  const selectedUri = isPoster ? images.data?.selectedPoster : images.data?.selectedBackdrop;
+
+  const cell = (uri: string) => {
+    const selected = uri === selectedUri;
+    return (
+      <Pressable key={uri} style={isPoster ? pstyles.posterWrap : pstyles.bannerWrap} onPress={() => apply(uri)}>
+        <Image
+          source={{ uri: tmdbImage(uri, isPoster ? 'w342' : 'w500') ?? uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+        {selected ? (
+          <View style={pstyles.selectedShade}>
+            <View style={pstyles.selectedRow}>
+              <Text style={pstyles.selectedStar}>★</Text>
+              <Text style={pstyles.selectedText}>Sélectionnée</Text>
+            </View>
+          </View>
+        ) : null}
+        {busyUri === uri ? (
+          <View style={pstyles.busy}>
+            <ActivityIndicator color="#fff" />
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={mode !== null} animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: COLORS.white }}>
         <View style={pstyles.header}>
           <Pressable onPress={onClose} hitSlop={12}>
-            <Feather name="x" size={26} color={COLORS.black} />
+            <Feather name="arrow-left" size={24} color={COLORS.black} />
           </Pressable>
-          <Text style={pstyles.title}>Personnaliser</Text>
-          <View style={{ width: 26 }} />
+          <Text style={pstyles.title}>{isPoster ? "Modifier l'affiche" : 'Changer la bannière'}</Text>
+          <View style={{ width: 24 }} />
         </View>
         {images.isLoading ? (
           <Loading />
+        ) : list.length === 0 ? (
+          <Text style={pstyles.emptyNote}>
+            {isPoster ? 'Aucune affiche disponible.' : isMovie ? 'Aucune bannière disponible pour ce film.' : 'Aucune bannière disponible pour cette série.'}
+          </Text>
         ) : (
-          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-            <Text style={pstyles.section}>Affiche</Text>
-            <View style={pstyles.grid}>
-              {(images.data?.posters ?? []).map((uri) => {
-                const selected = uri === images.data?.selectedPoster;
-                return (
-                  <Pressable key={uri} style={[pstyles.posterWrap, selected && pstyles.selected]} onPress={() => apply('poster', uri)}>
-                    <Image source={{ uri: tmdbImage(uri, 'w185') ?? uri }} style={pstyles.poster} resizeMode="cover" />
-                    {selected ? (
-                      <View style={pstyles.check}>
-                        <Feather name="check" size={18} color="#fff" />
-                      </View>
-                    ) : null}
-                    {busyUri === uri ? (
-                      <View style={pstyles.busy}>
-                        <ActivityIndicator color="#fff" />
-                      </View>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={[pstyles.section, { marginTop: 24 }]}>Bannière</Text>
-            {(images.data?.backdrops ?? []).length === 0 ? (
-              <Text style={pstyles.emptyNote}>{isMovie ? 'Aucune bannière disponible pour ce film.' : 'Aucune bannière disponible pour cette série.'}</Text>
-            ) : (
-              <View style={{ gap: 12 }}>
-                {(images.data?.backdrops ?? []).map((uri) => {
-                  const selected = uri === images.data?.selectedBackdrop;
-                  return (
-                    <Pressable key={uri} style={[pstyles.bannerWrap, selected && pstyles.selected]} onPress={() => apply('banner', uri)}>
-                      <Image source={{ uri: tmdbImage(uri, 'w500') ?? uri }} style={pstyles.banner} resizeMode="cover" />
-                      {selected ? (
-                        <View style={pstyles.check}>
-                          <Feather name="check" size={18} color="#fff" />
-                        </View>
-                      ) : null}
-                      {busyUri === uri ? (
-                        <View style={pstyles.busy}>
-                          <ActivityIndicator color="#fff" />
-                        </View>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
+          <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 }}>
+            <View style={isPoster ? pstyles.grid : pstyles.bannerList}>{list.map(cell)}</View>
           </ScrollView>
         )}
       </View>
@@ -431,18 +492,26 @@ function ListsSheet({
 }
 
 const pstyles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 54, paddingBottom: 12 },
-  title: { fontSize: 20, fontFamily: FONTS.extraBold },
-  section: { fontSize: 18, fontFamily: FONTS.extraBold, marginBottom: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  posterWrap: { width: '31%', aspectRatio: 2 / 3, borderRadius: 6, overflow: 'hidden', backgroundColor: '#e5e5e5' },
-  poster: { width: '100%', height: '100%' },
-  bannerWrap: { width: '100%', aspectRatio: 16 / 9, borderRadius: 6, overflow: 'hidden', backgroundColor: '#e5e5e5' },
-  banner: { width: '100%', height: '100%' },
-  selected: { borderWidth: 3, borderColor: COLORS.yellow },
-  check: { position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: 13, backgroundColor: COLORS.black, alignItems: 'center', justifyContent: 'center' },
+  // Mesures TV Time (réf. 38-40) : entête « Personnaliser » 15 regular,
+  // options 17 semiBold, grille d'affiches 2 colonnes, sélection assombrie.
+  menuHeader: { fontSize: 15, fontFamily: FONTS.regular, color: '#555', paddingHorizontal: 22, paddingTop: 20, paddingBottom: 8 },
+  menuItem: { paddingHorizontal: 22, paddingVertical: 17 },
+  menuItemText: { fontSize: 17, fontFamily: FONTS.semiBold },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16,
+    paddingTop: 54, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border,
+  },
+  title: { fontSize: 18, fontFamily: FONTS.bold },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  posterWrap: { width: '48.3%', aspectRatio: 2 / 3, borderRadius: 8, overflow: 'hidden', backgroundColor: '#e5e5e5' },
+  bannerList: { gap: 12 },
+  bannerWrap: { width: '100%', aspectRatio: 16 / 9, borderRadius: 8, overflow: 'hidden', backgroundColor: '#e5e5e5' },
+  selectedShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  selectedRow: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 14 },
+  selectedStar: { color: COLORS.yellow, fontSize: 19, lineHeight: 22 },
+  selectedText: { color: COLORS.white, fontSize: 16, fontFamily: FONTS.semiBold },
   busy: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
-  emptyNote: { color: COLORS.textMuted, fontFamily: FONTS.regular, fontSize: 15 },
+  emptyNote: { color: COLORS.textMuted, fontFamily: FONTS.regular, fontSize: 15, padding: 20 },
   listCount: { color: COLORS.textMuted, fontFamily: FONTS.regular, fontSize: 15 },
   newListRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 24, paddingVertical: 16 },
   newListInput: { flex: 1, borderBottomWidth: 1, borderBottomColor: COLORS.border, fontFamily: FONTS.regular, fontSize: 17, paddingVertical: 8 },
@@ -531,6 +600,9 @@ type EpisodesData = { seasons: SeasonData[]; nextEpisode: EpisodeDto | null };
 
 // Un épisode encore non diffusé (pas d'image de toute façon : rien n'a été diffusé).
 const isUpcoming = (iso?: string | null) => !!iso && new Date(iso).getTime() > Date.now();
+// Jours restants avant diffusion (arrondi supérieur, minimum 1 — façon TV Time).
+const daysUntil = (iso?: string | null) =>
+  iso ? Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)) : 0;
 
 // Vignette d'épisode : image TheTVDB/TMDb si disponible, sinon affiche de la série, sinon pictogramme.
 function EpThumb({ stillPath, fallback }: { stillPath?: string | null; fallback?: string | null }) {
@@ -672,9 +744,9 @@ function EpisodesTab({ showId, posterPath, onChange }: { showId: string; posterP
           <View style={{ padding: 12 }}>
             <View style={styles.eprow}>
               <EpThumb stillPath={data.nextEpisode.stillPath} fallback={posterPath} />
-              <View style={{ flex: 1, padding: 12 }}>
+              <View style={{ flex: 1, padding: 12, justifyContent: 'center' }}>
                 <Text style={styles.epCode}>{episodeCode(data.nextEpisode.seasonNumber, data.nextEpisode.episodeNumber)}</Text>
-                <Text numberOfLines={1}>{data.nextEpisode.title}</Text>
+                <Text style={styles.epRowTitle} numberOfLines={1}>{data.nextEpisode.title}</Text>
               </View>
               <View style={{ justifyContent: 'center', paddingRight: 14 }}>
                 <CheckCircle checked={data.nextEpisode.watched} onPress={() => toggleEp.mutate(data.nextEpisode!)} />
@@ -694,9 +766,13 @@ function EpisodesTab({ showId, posterPath, onChange }: { showId: string; posterP
         <View style={{ padding: 12 }}>
           {seasons.map((s) => {
             const isOpen = open[s.seasonNumber];
-            const done = s.totalCount > 0 && s.watchedCount === s.totalCount;
-            const started = s.watchedCount > 0;
-            const pct = s.totalCount > 0 ? Math.min(100, (s.watchedCount / s.totalCount) * 100) : 0;
+            // Progression basée sur les épisodes DÉJÀ DIFFUSÉS (règle TV Time) :
+            // « terminé » (vert) = tous les épisodes disponibles à date sont vus,
+            // même si la saison compte encore des épisodes à venir.
+            const airedEps = s.episodes.filter((e) => !isUpcoming(e.airDate));
+            const airedWatched = airedEps.filter((e) => e.watched).length;
+            const done = airedEps.length > 0 && airedWatched >= airedEps.length;
+            const pct = airedEps.length > 0 ? Math.min(100, (airedWatched / airedEps.length) * 100) : 0;
             const label = isSpecial(s) ? 'Épisodes spéciaux' : s.title;
             return (
               <View key={s.id} style={{ marginBottom: 12 }}>
@@ -715,41 +791,45 @@ function EpisodesTab({ showId, posterPath, onChange }: { showId: string; posterP
                     <CheckCircle
                       size={44}
                       checked={done}
-                      checkedBg={COLORS.green}
-                      checkedFg="#fff"
                       onPress={() => (done ? markAllUnwatched.mutate(s.seasonNumber) : markAll.mutate(s.seasonNumber))}
                     />
                   </View>
-                  {/* Barre de progression : jaune en cours, verte terminée. */}
-                  {started ? (
-                    <View style={[styles.progressTrack, { backgroundColor: done ? COLORS.green : COLORS.yellowSoft }]}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${pct}%`, backgroundColor: done ? COLORS.green : COLORS.yellow },
-                        ]}
-                      />
-                    </View>
-                  ) : null}
+                  {/* Barre : piste jaune pâle toujours visible, remplissage jaune,
+                      le tout vert quand tous les épisodes diffusés sont vus. */}
+                  <View style={[styles.progressTrack, done && { backgroundColor: COLORS.green }]}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${pct}%`, backgroundColor: done ? COLORS.green : COLORS.yellow },
+                      ]}
+                    />
+                  </View>
                 </Pressable>
                 {isOpen
-                  ? s.episodes.map((e) => (
-                      <View key={e.id} style={styles.eprow}>
-                        <EpThumb stillPath={e.stillPath} fallback={posterPath} />
-                        <View style={{ flex: 1, padding: 10 }}>
-                          <Text style={styles.epCode}>{episodeCode(e.seasonNumber, e.episodeNumber)}</Text>
-                          <Text numberOfLines={isUpcoming(e.airDate) ? 1 : 2}>{e.title}</Text>
-                          {isUpcoming(e.airDate) ? (
-                            <View style={styles.upBadge}>
-                              <Text style={styles.upBadgeText}>À VENIR · {shortDateFr(e.airDate).toUpperCase()}</Text>
-                            </View>
-                          ) : null}
+                  ? s.episodes.map((e) => {
+                      const upcoming = isUpcoming(e.airDate);
+                      return (
+                        <View key={e.id} style={styles.eprow}>
+                          <EpThumb stillPath={e.stillPath} fallback={posterPath} />
+                          <View style={{ flex: 1, padding: 10, justifyContent: 'center' }}>
+                            <Text style={styles.epCode}>{episodeCode(e.seasonNumber, e.episodeNumber)}</Text>
+                            <Text style={styles.epRowTitle} numberOfLines={2}>{e.title}</Text>
+                          </View>
+                          <View style={{ justifyContent: 'center', paddingRight: 14 }}>
+                            {upcoming ? (
+                              // Épisode pas encore diffusé : pas de coche, mais le
+                              // compte à rebours en jours (façon TV Time).
+                              <View style={styles.daysWrap}>
+                                <Text style={styles.daysNum}>{daysUntil(e.airDate)}</Text>
+                                <Text style={styles.daysLabel}>{daysUntil(e.airDate) > 1 ? 'JOURS' : 'JOUR'}</Text>
+                              </View>
+                            ) : (
+                              <CheckCircle size={44} checked={e.watched} onPress={() => toggleEp.mutate(e)} />
+                            )}
+                          </View>
                         </View>
-                        <View style={{ justifyContent: 'center', paddingRight: 14 }}>
-                          <CheckCircle size={44} checked={e.watched} onPress={() => toggleEp.mutate(e)} />
-                        </View>
-                      </View>
-                    ))
+                      );
+                    })
                   : null}
               </View>
             );
@@ -795,12 +875,22 @@ const styles = StyleSheet.create({
   epCode: { fontSize: 19, fontFamily: FONTS.extraBold },
   markAllBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: COLORS.black, alignItems: 'center', justifyContent: 'center' },
   season: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 76, paddingHorizontal: 20, backgroundColor: COLORS.white, borderRadius: 5, ...SHADOW.season },
-  upBadge: { alignSelf: 'flex-start', backgroundColor: COLORS.chipGrey, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3, marginTop: 6 },
-  upBadgeText: { fontSize: 11, fontFamily: FONTS.bold, color: COLORS.textMuted, letterSpacing: 0.4 },
+  epRowTitle: { fontFamily: FONTS.regular, fontSize: 13, marginTop: 2 },
+  // Compte à rebours des épisodes non diffusés (cf. TV Time : « 4 / JOURS »).
+  daysWrap: { alignItems: 'center', minWidth: 44 },
+  daysNum: { fontSize: 24, fontFamily: FONTS.extraBold, lineHeight: 27 },
+  daysLabel: { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.8 },
   seasonTitle: { fontSize: 24, fontFamily: FONTS.extraBold },
   seasonProg: { fontFamily: FONTS.regular, fontSize: 17, marginRight: 14 },
-  progressTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 5, borderBottomLeftRadius: 5, borderBottomRightRadius: 5, overflow: 'hidden' },
+  progressTrack: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 5,
+    borderBottomLeftRadius: 5, borderBottomRightRadius: 5, overflow: 'hidden',
+    backgroundColor: 'rgba(255,212,0,0.30)', // piste jaune pâle toujours visible (réf. 35)
+  },
   progressFill: { position: 'absolute', left: 0, bottom: 0, top: 0, borderBottomLeftRadius: 5 },
+  // Barre de progression globale de la série, au bas de la bannière (TV Time).
+  heroProgressTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 5, backgroundColor: 'rgba(255,212,0,0.35)' },
+  heroProgressFill: { height: '100%' },
   unmarkBar: { position: 'absolute', left: 12, right: 12, bottom: 20, backgroundColor: COLORS.white, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 18, ...SHADOW.card },
   unmarkText: { fontSize: 17, fontFamily: FONTS.semiBold, color: COLORS.black },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: COLORS.overlay },

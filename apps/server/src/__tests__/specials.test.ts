@@ -107,6 +107,16 @@ describe('Épisodes spéciaux (façon TV Time)', () => {
     expect(seasons.find((s) => s.seasonNumber === 0)!.watchedCount).toBe(1);
   });
 
+  it('un épisode non encore diffusé ne peut pas être coché', async () => {
+    const { prisma } = await import('../db/client.js');
+    const future = await prisma.episode.create({
+      data: { showId, seasonNumber: 1, episodeNumber: 99, title: 'Futur', airDate: new Date(Date.now() + 5 * 86_400_000) },
+    });
+    const res = await app.inject({ method: 'POST', url: `/api/episodes/${future.id}/watched`, headers: auth() });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('not_aired_yet');
+  });
+
   it("l'historique de visionnage renvoie les derniers épisodes cochés", async () => {
     const res = await app.inject({ method: 'GET', url: '/api/shows/history', headers: auth() });
     expect(res.statusCode).toBe(200);

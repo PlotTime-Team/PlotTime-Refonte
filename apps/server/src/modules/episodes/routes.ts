@@ -36,6 +36,9 @@ export async function episodeRoutes(app: FastifyInstance): Promise<void> {
     const body = z.object({ watchedAt: z.string().datetime().optional() }).parse(request.body ?? {});
     const exists = await prisma.episode.findUnique({ where: { id } });
     if (!exists) return reply.code(404).send({ error: 'not_found' });
+    // Un épisode pas encore diffusé ne peut pas être coché (règle TV Time).
+    if (exists.airDate && exists.airDate.getTime() > Date.now())
+      return reply.code(400).send({ error: 'not_aired_yet' });
     await markEpisodeWatched(request.userId, id, body.watchedAt ? new Date(body.watchedAt) : new Date());
     return { ok: true };
   });
