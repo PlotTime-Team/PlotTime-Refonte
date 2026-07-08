@@ -7,7 +7,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { api, tmdbImage } from '@/lib/api';
 import { useDebounced } from '@/lib/useDebounced';
 import { COLORS, FONTS } from '@/lib/theme';
-import { EmptyState, Loading } from '@/components/ui';
+import { EmptyState, Loading, LoadError } from '@/components/ui';
 
 type PublicUser = { id: string; displayName: string; avatarUrl: string | null; isFollowing?: boolean };
 type FeedItem = {
@@ -64,11 +64,12 @@ function Tab({ label, active, onPress }: { label: string; active: boolean; onPre
 
 function FeedTab() {
   const router = useRouter();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['social', 'feed'],
     queryFn: () => api.get<{ items: FeedItem[] }>('/api/social/feed'),
   });
   if (isLoading) return <Loading />;
+  if (isError && !data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   const items = data?.items ?? [];
   if (items.length === 0)
     return (

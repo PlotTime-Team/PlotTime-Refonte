@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Modal, TextInput, ActivityIndicator, Image, Share } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Modal, TextInput, ActivityIndicator, Image, Share, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import { api, tmdbImage } from '@/lib/api';
 import type { EpisodeDto, MediaDto } from '@/lib/types';
 import { episodeCode, shortDateFr } from '@/lib/format';
 import { COLORS, RADIUS, SHADOW, FONTS } from '@/lib/theme';
-import { TopTabs, CheckCircle, Loading, EmptyState } from '@/components/ui';
+import { TopTabs, CheckCircle, Loading, LoadError, EmptyState } from '@/components/ui';
 
 const INTEREST = ['LES ACTEURS', 'LA PRÉMISSE', 'LES CRÉATEURS', 'LA CHAÎNE/LA PLATEFORME', "LA FRANCHISE OU L'UNIVERS", 'AUTRE'];
 const STATUS_LABELS: Record<string, string> = {
@@ -76,10 +76,24 @@ export default function ShowDetail() {
     onSettled: refresh,
   });
   const share = () => {
-    Share.share({ message: `Regarde « ${detail.data?.media?.title} » — suivi avec SerieTime 📺` }).catch(() => undefined);
+    const message = `Regarde « ${detail.data?.media?.title} » — suivi avec SerieTime 📺`;
+    const url = typeof window !== 'undefined' ? window.location.href : undefined;
+    // Web app (plateforme principale) : Share natif RN n'existe pas → Web Share
+    // API si dispo (Safari iOS / Chrome Android), sinon copie dans le presse-papier.
+    if (Platform.OS === 'web') {
+      const nav = typeof navigator !== 'undefined' ? (navigator as Navigator & { share?: (d: object) => Promise<void> }) : undefined;
+      if (nav?.share) {
+        nav.share({ title: 'SerieTime', text: message, url }).catch(() => undefined);
+      } else if (nav?.clipboard) {
+        nav.clipboard.writeText(`${message}${url ? ` ${url}` : ''}`).then(() => showToast('Lien copié'), () => undefined);
+      }
+      return;
+    }
+    Share.share({ message }).catch(() => undefined);
   };
 
-  if (detail.isLoading || !detail.data) return <Loading />;
+  if (detail.isLoading) return <Loading />;
+  if (!detail.data) return <LoadError onRetry={detail.refetch} busy={detail.isRefetching} />;
   const media: MediaDto = detail.data.media;
   const isFollowed = media.userStatus != null;
 
@@ -532,7 +546,7 @@ function EpThumb({ stillPath, fallback }: { stillPath?: string | null; fallback?
 function EpisodesTab({ showId, posterPath, onChange }: { showId: string; posterPath?: string | null; onChange: () => void }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState<Record<number, boolean>>({});
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['show', showId, 'episodes'],
     queryFn: () => api.get<EpisodesData>(`/api/shows/${showId}/episodes`),
   });
@@ -595,7 +609,8 @@ function EpisodesTab({ showId, posterPath, onChange }: { showId: string; posterP
     onSettled: refresh,
   });
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (!data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   if (data.seasons.length === 0) return <EmptyState title="Aucun épisode" />;
 
   return (

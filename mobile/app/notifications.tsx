@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import { COLORS, FONTS } from '@/lib/theme';
-import { EmptyState, Loading } from '@/components/ui';
+import { EmptyState, Loading, LoadError } from '@/components/ui';
 
 type Notif = {
   id: string;
@@ -16,7 +16,7 @@ type Notif = {
   imageUrl: string | null;
   date: string;
   isRead: boolean;
-  meta: { actorId?: string; mediaId?: string; commentId?: string };
+  meta: { actorId?: string; mediaId?: string; mediaType?: 'show' | 'movie'; commentId?: string };
 };
 
 const ICON: Record<string, keyof typeof Feather.glyphMap> = {
@@ -30,7 +30,7 @@ export default function Notifications() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => api.get<{ notifications: Notif[]; unreadCount: number }>('/api/notifications'),
   });
@@ -55,6 +55,8 @@ export default function Notifications() {
 
       {isLoading ? (
         <Loading />
+      ) : isError && !data ? (
+        <LoadError onRetry={refetch} busy={isRefetching} />
       ) : (data?.notifications.length ?? 0) === 0 ? (
         <EmptyState title="Aucune notification" message="L’activité de vos amis apparaîtra ici." />
       ) : (
@@ -65,7 +67,10 @@ export default function Notifications() {
               <Pressable
                 key={n.id}
                 style={[styles.row, !n.isRead && styles.unread]}
-                onPress={() => n.meta.mediaId && router.push(`/show/${n.meta.mediaId}`)}
+                onPress={() =>
+                  n.meta.mediaId &&
+                  router.push(`/show/${n.meta.mediaId}${n.meta.mediaType === 'movie' ? '?type=movie' : ''}`)
+                }
               >
                 <View style={styles.iconWrap}>
                   <Feather name={ICON[n.type] ?? 'bell'} size={20} color={COLORS.black} />

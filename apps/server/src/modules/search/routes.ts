@@ -217,10 +217,24 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
           });
         }
       }
-      // Page de tendances tirée au hasard puis mélange : le pull-to-refresh renouvelle le flux.
+      // Page tirée au hasard : le pull-to-refresh / bouton ↻ renouvelle le flux.
       const page = 1 + Math.floor(Math.random() * 3);
-      const [tv, movies] = await Promise.all([tmdbTrending('tv', page), tmdbTrending('movie', page)]);
-      const pool = [...tv, ...movies].sort(() => Math.random() - 0.5).slice(0, 18);
+      // Chaque catégorie a son propre vivier pour rester fournie (≥15-20) même
+      // filtrée : tendances séries + tendances films + découverte séries + films +
+      // un vivier ANIMÉ dédié (genre animation d'origine japonaise, quasi absent
+      // des tendances). Sans ce vivier, filtrer « Animés » ne laissait que ~3 cartes.
+      const { tmdbDiscover } = await import('../../services/tmdb/index.js');
+      const [tv, movies, discTv, discMovies, animeTv, animeMovies] = await Promise.all([
+        tmdbTrending('tv', page),
+        tmdbTrending('movie', page),
+        tmdbDiscover('tv', { page }),
+        tmdbDiscover('movie', { page }),
+        tmdbDiscover('tv', { genres: [16], language: 'ja', page }),
+        tmdbDiscover('movie', { genres: [16], language: 'ja', page }),
+      ]);
+      const pool = [...tv, ...movies, ...discTv, ...discMovies, ...animeTv, ...animeMovies].sort(
+        () => Math.random() - 0.5,
+      );
       for (const r of pool) {
         const trendType = r.title ? 'movie' : 'show';
         const trendTitle = r.name ?? r.title ?? '';
@@ -246,10 +260,21 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     // Déduplique en conservant l'ordre — par id TMDb ET par titre normalisé
     // (la même œuvre peut exister sous plusieurs ids selon la plateforme).
     const seen = new Set<string>();
-    const feed = cards.filter((c) => {
+    const deduped = cards.filter((c) => {
       const keys = [`${c.type}:${c.tmdbId}`, `${c.type}:${norm(c.title)}`];
       if (keys.some((k) => seen.has(k))) return false;
       keys.forEach((k) => seen.add(k));
+      return true;
+    });
+    // Plafond équilibré : au plus PER_CAT items par catégorie (serie/film/anime),
+    // pour que chaque filtre de l'app reste fourni sans renvoyer une liste énorme.
+    const PER_CAT = 22;
+    const perCat = new Map<string, number>();
+    const feed = deduped.filter((c) => {
+      const cat = c.category ?? (c.type === 'show' ? 'serie' : 'film');
+      const n = perCat.get(cat) ?? 0;
+      if (n >= PER_CAT) return false;
+      perCat.set(cat, n + 1);
       return true;
     });
     return { feed };

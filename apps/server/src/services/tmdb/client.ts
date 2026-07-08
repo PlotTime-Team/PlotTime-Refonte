@@ -211,6 +211,24 @@ export async function tmdbTrending(type: 'tv' | 'movie', page = 1): Promise<Tmdb
   return data?.results ?? [];
 }
 
+// Découverte ciblée : sert à remplir chaque catégorie du flux Explorer (ex. les
+// animés, quasi absents des « tendances »). `genres` = ids TMDb, `language` =
+// langue d'origine (ex. 'ja' pour l'anime japonais).
+export async function tmdbDiscover(
+  type: 'tv' | 'movie',
+  opts: { genres?: number[]; language?: string; page?: number } = {},
+): Promise<TmdbSearchResult[]> {
+  const params: Record<string, string> = {
+    sort_by: 'popularity.desc',
+    page: String(opts.page ?? 1),
+    'vote_count.gte': '20',
+  };
+  if (opts.genres?.length) params.with_genres = opts.genres.join(',');
+  if (opts.language) params.with_original_language = opts.language;
+  const data = await cachedFetch<{ results: TmdbSearchResult[] }>(`/discover/${type}`, params, 1 * DAY);
+  return data?.results ?? [];
+}
+
 export async function tmdbVideos(type: 'tv' | 'movie', tmdbId: string): Promise<{ results?: { site?: string; type?: string; key?: string }[] } | null> {
   return cachedFetch(`/${type}/${tmdbId}/videos`, {}, 30 * DAY);
 }

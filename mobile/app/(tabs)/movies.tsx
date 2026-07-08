@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import type { MediaDto } from '@/lib/types';
 import { COLORS } from '@/lib/theme';
-import { PillHeader, TopTabs, EmptyState, Loading, Poster } from '@/components/ui';
+import { PillHeader, TopTabs, EmptyState, Loading, LoadError, Poster } from '@/components/ui';
 
 type MoviesResponse = { toWatch: MediaDto[]; upcoming: { media: MediaDto; releaseDate: string }[] };
 
@@ -14,7 +14,7 @@ export default function MoviesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tab, setTab] = useState('À VOIR');
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['movies'],
     queryFn: () => api.get<MoviesResponse>('/api/movies'),
   });
@@ -36,6 +36,8 @@ export default function MoviesScreen() {
       </View>
       {isLoading ? (
         <Loading />
+      ) : isError && !data ? (
+        <LoadError onRetry={refetch} busy={isRefetching} />
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
           {tab === 'À VOIR' ? (

@@ -8,7 +8,7 @@ import { api, tmdbImage } from '@/lib/api';
 import type { MediaDto, ProfileStatsDto } from '@/lib/types';
 import { watchTime } from '@/lib/format';
 import { COLORS, FONTS } from '@/lib/theme';
-import { Loading, Poster } from '@/components/ui';
+import { Loading, LoadError, Poster } from '@/components/ui';
 
 export type ProfileUser = {
   displayName: string;
@@ -34,7 +34,7 @@ type ProfileResponse = {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['profile'],
     queryFn: () => api.get<ProfileResponse>('/api/profile'),
   });
@@ -45,7 +45,8 @@ export default function ProfileScreen() {
   });
   const unread = unreadData?.unreadCount ?? 0;
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (!data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   const { user, stats } = data;
   const st = watchTime(stats.showMinutes);
 

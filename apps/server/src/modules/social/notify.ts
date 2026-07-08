@@ -9,8 +9,15 @@ type NotifPayload = {
   commentId?: string;
 };
 
-function meta(actorId: string, p: NotifPayload): string {
-  return JSON.stringify({ actorId, mediaId: p.mediaId, commentId: p.commentId });
+// Type du média concerné (pour que l'app ouvre la bonne fiche : série vs film).
+async function mediaTypeOf(mediaId?: string): Promise<'show' | 'movie' | undefined> {
+  if (!mediaId) return undefined;
+  const m = await prisma.media.findUnique({ where: { id: mediaId }, select: { type: true } });
+  return (m?.type as 'show' | 'movie' | undefined) ?? undefined;
+}
+
+function meta(actorId: string, p: NotifPayload, mediaType?: 'show' | 'movie'): string {
+  return JSON.stringify({ actorId, mediaId: p.mediaId, mediaType, commentId: p.commentId });
 }
 
 // Notifie un utilisateur précis (jamais soi-même).
@@ -24,7 +31,7 @@ export async function notifyUser(recipientId: string, actorId: string, p: NotifP
       body: p.body ?? undefined,
       imageUrl: p.imageUrl ?? undefined,
       date: new Date(),
-      metadataJson: meta(actorId, p),
+      metadataJson: meta(actorId, p, await mediaTypeOf(p.mediaId)),
     },
   });
 }
@@ -37,6 +44,7 @@ export async function notifyFollowers(actorId: string, p: NotifPayload): Promise
   });
   if (followers.length === 0) return;
   const now = new Date();
+  const mediaType = await mediaTypeOf(p.mediaId);
   await prisma.notification.createMany({
     data: followers.map((f) => ({
       userId: f.followerId,
@@ -45,7 +53,7 @@ export async function notifyFollowers(actorId: string, p: NotifPayload): Promise
       body: p.body ?? undefined,
       imageUrl: p.imageUrl ?? undefined,
       date: now,
-      metadataJson: meta(actorId, p),
+      metadataJson: meta(actorId, p, mediaType),
     })),
   });
 }
