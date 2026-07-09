@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-09** (Claude) — cotes « pixel perfect » Explorer + Profil (suite du recalage TV Time du 08/07)
+Dernière mise à jour : **2026-07-09** (Claude) — couverture du profil derrière la barre de statut + cotes « pixel perfect » Explorer/Profil
 
 ---
 
@@ -65,6 +65,15 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 ## Journal des modifications
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
+
+### 2026-07-09 — Claude (3)
+- **Profil : couverture derrière la barre de statut** (comme TV Time). En natif
+  (edge-to-edge Android déjà actif + iOS par défaut) : l'en-tête s'étend de
+  `insets.top` et les **icônes de statut passent en clair** tant que l'écran est
+  affiché (`expo-status-bar` + `useIsFocused`). Sur la **web app**, l'OS réserve
+  la zone de statut : elle est **teintée de la couleur de l'en-tête** via un
+  swap dynamique du meta `theme-color` (suivi par Android), restauré en quittant
+  l'écran. Appliqué à l'onglet Profil **et** au profil public (`/user/[id]`).
 
 ### 2026-07-09 — Claude (2)
 - **Cotes « pixel perfect » Explorer + Profil** (comparaison px des captures

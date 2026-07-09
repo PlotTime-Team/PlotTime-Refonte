@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
@@ -30,6 +32,17 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const focused = useIsFocused();
+
+  // Comme sur l'onglet Profil : en-tête sombre fondu avec la barre de statut
+  // (icônes claires en natif, zone teintée via theme-color sur la web app).
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined' || !focused) return;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const prev = meta?.getAttribute('content') ?? '#FFFFFF';
+    meta?.setAttribute('content', '#20202a');
+    return () => meta?.setAttribute('content', prev);
+  }, [focused]);
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['user', id],
@@ -55,6 +68,7 @@ export default function UserProfileScreen() {
   return (
     <Pop>
     <ScrollView style={{ flex: 1, backgroundColor: COLORS.white }} contentContainerStyle={{ paddingBottom: 24 }}>
+      {focused ? <StatusBar style="light" /> : null}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Feather name="chevron-left" size={28} color="#fff" />

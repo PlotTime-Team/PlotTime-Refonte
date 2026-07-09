@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image, Dimensions, RefreshControl } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, Dimensions, RefreshControl, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
@@ -43,6 +45,20 @@ export default function ProfileScreen() {
 function ProfileScreenInner() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const focused = useIsFocused();
+
+  // La couverture passe DERRIÈRE la barre de statut, comme TV Time. En natif
+  // (edge-to-edge), l'en-tête s'étend sous la barre et les icônes passent en
+  // clair tant que l'onglet est affiché. Sur la web app, l'OS réserve la zone
+  // de statut : on la teinte de la couleur de l'en-tête (meta theme-color,
+  // suivi dynamiquement par Android) pour la fondre avec la couverture.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined' || !focused) return;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const prev = meta?.getAttribute('content') ?? '#FFFFFF';
+    meta?.setAttribute('content', '#20202a');
+    return () => meta?.setAttribute('content', prev);
+  }, [focused]);
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['profile'],
     queryFn: () => api.get<ProfileResponse>('/api/profile'),
@@ -68,7 +84,11 @@ function ProfileScreenInner() {
       contentContainerStyle={{ paddingBottom: 24 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
     >
-      <View style={styles.head}>
+      {/* Icônes de la barre de statut en clair sur la couverture sombre (natif). */}
+      {focused ? <StatusBar style="light" /> : null}
+      {/* + insets.top : la zone visible de la couverture reste ~200dp une fois
+          la barre de statut par-dessus. */}
+      <View style={[styles.head, { height: 200 + insets.top }]}>
         {user.coverUrl ? (
           <>
             <Image source={{ uri: tmdbImage(user.coverUrl, 'w780') ?? user.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
