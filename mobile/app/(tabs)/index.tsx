@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,8 +11,9 @@ import { COLORS, SHADOW, FONTS } from '@/lib/theme';
 import { PillHeader, TopTabs, EmptyState, LoadError, ShowPill, Badge, CheckCircle } from '@/components/ui';
 import { EpisodeQueueCard } from '@/components/EpisodeQueueCard';
 import { useTabResetSeq } from '@/lib/tabReset';
-import { AppearItem } from '@/components/anim';
+import { AppearItem, FadeSwitch } from '@/components/anim';
 import { QueueSkeleton } from '@/components/skeletons';
+import { usePullRefresh } from '@/lib/usePullRefresh';
 
 export default function ShowsScreen() {
   const insets = useSafeAreaInsets();
@@ -33,7 +34,7 @@ function ShowsScreenInner({ insets }: { insets: { top: number } }) {
       <View style={{ paddingTop: insets.top, backgroundColor: COLORS.white }}>
         <TopTabs tabs={['À VOIR', 'À VENIR']} active={tab} onChange={setTab} />
       </View>
-      {tab === 'À VOIR' ? <QueueView /> : <UpcomingView />}
+      <FadeSwitch trigger={tab}>{tab === 'À VOIR' ? <QueueView /> : <UpcomingView />}</FadeSwitch>
     </>
   );
 }
@@ -85,6 +86,8 @@ function QueueView() {
     },
   });
 
+  const { refreshing, onRefresh } = usePullRefresh([refetch, history.refetch]);
+
   if (isLoading) return <QueueSkeleton />;
   if (isError && !data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   // Du plus ancien au plus récent : le dernier épisode coché juste au-dessus
@@ -102,7 +105,11 @@ function QueueView() {
   (data?.items ?? []).forEach((it) => groups.set(it.group, [...(groups.get(it.group) ?? []), it]));
 
   return (
-    <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 16 }}>
+    <ScrollView
+      ref={scrollRef}
+      contentContainerStyle={{ paddingBottom: 16 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
+    >
       {historyItems.length > 0 ? (
         <View
           onLayout={(e) => {
@@ -155,13 +162,17 @@ function UpcomingView() {
     queryKey: ['shows', 'upcoming'],
     queryFn: () => api.get<{ groups: { label: string; items: UpcomingItemDto[] }[] }>('/api/shows/upcoming'),
   });
+  const { refreshing, onRefresh } = usePullRefresh([refetch]);
   if (isLoading) return <QueueSkeleton />;
   if (isError && !data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   if (!data || data.groups.length === 0)
     return <EmptyState title="Aucun épisode à venir" message="Les prochaines diffusions apparaîtront ici." />;
 
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
+    <ScrollView
+      contentContainerStyle={{ paddingBottom: 16 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
+    >
       {data.groups.map((g) => (
         <View key={g.label}>
           <PillHeader label={g.label} />

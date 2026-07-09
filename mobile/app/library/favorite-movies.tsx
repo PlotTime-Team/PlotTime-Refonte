@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Modal, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Modal, Image, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { LoadError, EmptyState } from '@/components/ui';
 import { LibHeader, Grid, MovieCell } from '@/components/library';
 import { Pop } from '@/components/anim';
 import { GridSkeleton } from '@/components/skeletons';
+import { usePullRefresh } from '@/lib/usePullRefresh';
 
 export default function FavoriteMoviesScreen() {
   const [picker, setPicker] = useState(false);
@@ -19,6 +20,7 @@ export default function FavoriteMoviesScreen() {
   });
   const all = [...(data?.seen ?? []), ...(data?.unseen ?? [])];
   const favs = all.filter((m) => m.isFavorite);
+  const { refreshing, onRefresh } = usePullRefresh([refetch]);
 
   return (
     <Pop style={{ backgroundColor: COLORS.white }}>
@@ -28,7 +30,10 @@ export default function FavoriteMoviesScreen() {
       ) : isError && !data ? (
         <LoadError onRetry={refetch} busy={isRefetching} />
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 24 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
+        >
           <Pressable style={styles.addBtn} onPress={() => setPicker(true)}>
             <Text style={styles.addText}>AJOUTER/SUPPRIMER DES FILMS</Text>
           </Pressable>

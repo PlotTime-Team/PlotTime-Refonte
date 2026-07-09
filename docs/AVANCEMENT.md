@@ -66,6 +66,14 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
 
+### 2026-07-08 — Claude (11)
+- **Vague d'animations 3** :
+  - **Micro-transitions des onglets hauts** : bascule À VOIR / À VENIR et
+    À PROPOS / ÉPISODES / DISCUSSION en fondu + léger glissement (`FadeSwitch`).
+  - **Tirer pour rafraîchir** (teinte jaune de marque) sur « À voir », « À venir »,
+    les pages profil (Séries, Films, favoris) et le profil (`lib/usePullRefresh.ts`
+    + `RefreshControl`).
+
 ### 2026-07-08 — Claude (10)
 - **Vague d'animations 2** (toujours API `Animated`, reduce-motion respecté) :
   - **Skeleton loaders pulsants** à la place du spinner (`components/skeletons.tsx`

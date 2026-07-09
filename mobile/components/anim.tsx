@@ -129,6 +129,38 @@ export function PressableScale({
   );
 }
 
+// Fondu + léger glissement latéral à chaque changement de `trigger` (ex. bascule
+// des onglets hauts À VOIR / À VENIR). Le contenu n'est pas remonté, juste animé.
+export function FadeSwitch({
+  trigger,
+  children,
+  style,
+}: {
+  trigger: string | number;
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const reduce = useReduceMotion();
+  const v = useRef(new Animated.Value(1)).current;
+  const first = useRef(true);
+  useEffect(() => {
+    if (reduce) { v.setValue(1); return; }
+    if (first.current) { first.current = false; return; }
+    v.setValue(0);
+    Animated.timing(v, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: NATIVE }).start();
+  }, [trigger, reduce, v]);
+  return (
+    <Animated.View
+      style={[
+        { flex: 1, opacity: v, transform: [{ translateX: v.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] },
+        style,
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 // Bloc « squelette » qui pulse doucement pendant les chargements (à la place
 // d'un simple spinner) : l'app paraît réactive et le layout ne saute pas.
 export function Skeleton({ style }: { style?: StyleProp<ViewStyle> }) {

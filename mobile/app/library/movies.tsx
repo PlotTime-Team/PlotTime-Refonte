@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Modal, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { LoadError, EmptyState } from '@/components/ui';
 import { LibHeader, SectionPill, Grid, MovieCell } from '@/components/library';
 import { Pop } from '@/components/anim';
 import { GridSkeleton } from '@/components/skeletons';
+import { usePullRefresh } from '@/lib/usePullRefresh';
 
 type Sort = 'last_watched' | 'last_added' | 'alpha';
 type Filter = 'all' | 'seen' | 'unseen';
@@ -35,6 +36,7 @@ export default function LibraryMoviesScreen() {
   });
   const seen = data?.seen ?? [];
   const unseen = data?.unseen ?? [];
+  const { refreshing, onRefresh } = usePullRefresh([refetch]);
 
   return (
     <Pop style={{ backgroundColor: COLORS.white }}>
@@ -53,7 +55,10 @@ export default function LibraryMoviesScreen() {
       ) : seen.length === 0 && unseen.length === 0 ? (
         <EmptyState title="Aucun film" message="Ajoutez des films depuis Explorer." />
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 120 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
+        >
           {seen.length > 0 ? (
             <View>
               <SectionPill label="Vu" />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Modal, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { LoadError, EmptyState } from '@/components/ui';
 import { LibHeader, SectionPill, Grid, ShowCell, type LibraryShow } from '@/components/library';
 import { Pop, AppearItem } from '@/components/anim';
 import { GridSkeleton } from '@/components/skeletons';
+import { usePullRefresh } from '@/lib/usePullRefresh';
 
 type Sort = 'default' | 'added' | 'alpha';
 type Progress = 'all' | 'watching' | 'not_started' | 'watchlist' | 'up_to_date' | 'completed' | 'abandoned';
@@ -74,6 +75,8 @@ export default function LibraryShowsScreen() {
     queryKey: ['shows', 'library'],
     queryFn: () => api.get<{ items: LibraryShow[] }>('/api/shows/library'),
   });
+  const { refreshing, onRefresh } = usePullRefresh([refetch]);
+  const refreshCtl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />;
 
   return (
     <Pop style={{ backgroundColor: COLORS.white }}>
@@ -90,7 +93,7 @@ export default function LibraryShowsScreen() {
       ) : isError && !data ? (
         <LoadError onRetry={refetch} busy={isRefetching} />
       ) : (
-        <Body items={data?.items ?? []} sort={sort} filter={filter} />
+        <Body items={data?.items ?? []} sort={sort} filter={filter} refreshCtl={refreshCtl} />
       )}
       <Pressable style={styles.filtresBtn} onPress={() => setSheet(true)}>
         <Feather name="sliders" size={18} color={COLORS.black} />
@@ -107,14 +110,14 @@ export default function LibraryShowsScreen() {
   );
 }
 
-function Body({ items, sort, filter }: { items: LibraryShow[]; sort: Sort; filter: Progress }) {
+function Body({ items, sort, filter, refreshCtl }: { items: LibraryShow[]; sort: Sort; filter: Progress; refreshCtl: React.ComponentProps<typeof ScrollView>['refreshControl'] }) {
   if (items.length === 0) return <EmptyState title="Aucune série suivie" message="Ajoutez des séries depuis Explorer." />;
 
   // Filtre actif : grille à plat. Sinon : sections par statut (façon TV Time).
   if (filter !== 'all') {
     const list = sortItems(items.filter((s) => matchesFilter(s, filter)), sort);
     return (
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} refreshControl={refreshCtl}>
         <Grid>{list.map((s) => <ShowCell key={s.id} show={s} />)}</Grid>
       </ScrollView>
     );
@@ -126,7 +129,7 @@ function Body({ items, sort, filter }: { items: LibraryShow[]; sort: Sort; filte
     groups.set(g, [...(groups.get(g) ?? []), s]);
   });
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView contentContainerStyle={{ paddingBottom: 120 }} refreshControl={refreshCtl}>
       {GROUP_ORDER.filter((g) => groups.has(g)).map((g, gi) => (
         <AppearItem key={g} index={gi}>
           <SectionPill label={GROUP_LABEL[g]!} />

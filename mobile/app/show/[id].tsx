@@ -9,7 +9,7 @@ import type { EpisodeDto, MediaDto } from '@/lib/types';
 import { episodeCode } from '@/lib/format';
 import { COLORS, RADIUS, SHADOW, FONTS } from '@/lib/theme';
 import { TopTabs, CheckCircle, Loading, LoadError, EmptyState } from '@/components/ui';
-import { AnimatedFill, Pop, SlideUpBar } from '@/components/anim';
+import { AnimatedFill, Pop, SlideUpBar, FadeSwitch } from '@/components/anim';
 
 const INTEREST = ['LES ACTEURS', 'LA PRÉMISSE', 'LES CRÉATEURS', 'LA CHAÎNE/LA PLATEFORME', "LA FRANCHISE OU L'UNIVERS", 'AUTRE'];
 const STATUS_LABELS: Record<string, string> = {
@@ -177,13 +177,15 @@ export default function ShowDetail() {
       ) : (
         <>
           <TopTabs tabs={['À PROPOS', 'ÉPISODES', 'DISCUSSION']} active={tab} onChange={setTab} />
-          {tab === 'À PROPOS' ? (
-            <AboutTab media={media} detail={detail.data} interest={interest} setInterest={setInterest} />
-          ) : tab === 'ÉPISODES' ? (
-            <EpisodesTab showId={String(id)} posterPath={media.posterPath} onChange={refresh} />
-          ) : (
-            <CommentsTab mediaId={String(id)} />
-          )}
+          <FadeSwitch trigger={tab}>
+            {tab === 'À PROPOS' ? (
+              <AboutTab media={media} detail={detail.data} interest={interest} setInterest={setInterest} />
+            ) : tab === 'ÉPISODES' ? (
+              <EpisodesTab showId={String(id)} posterPath={media.posterPath} onChange={refresh} />
+            ) : (
+              <CommentsTab mediaId={String(id)} />
+            )}
+          </FadeSwitch>
         </>
       )}
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, Dimensions, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { watchTime } from '@/lib/format';
 import { COLORS, FONTS } from '@/lib/theme';
 import { Loading, LoadError, Poster } from '@/components/ui';
 import { useTabResetSeq } from '@/lib/tabReset';
+import { usePullRefresh } from '@/lib/usePullRefresh';
 
 export type ProfileUser = {
   displayName: string;
@@ -52,6 +53,8 @@ function ProfileScreenInner() {
   });
   const unread = unreadData?.unreadCount ?? 0;
 
+  const { refreshing, onRefresh } = usePullRefresh([refetch]);
+
   if (isLoading) return <Loading />;
   if (!data) return <LoadError onRetry={refetch} busy={isRefetching} />;
   const { user, stats } = data;
@@ -59,7 +62,11 @@ function ProfileScreenInner() {
   const mt = watchTime(stats.movieMinutes);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: COLORS.white }} contentContainerStyle={{ paddingBottom: 24 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: COLORS.white }}
+      contentContainerStyle={{ paddingBottom: 24 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
+    >
       <View style={styles.head}>
         {user.coverUrl ? (
           <>
