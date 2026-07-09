@@ -225,6 +225,37 @@ export async function showRoutes(app: FastifyInstance): Promise<void> {
     return { groups };
   });
 
+  // Bibliothèque « Séries » du profil (page dédiée façon TV Time) : liste à plat
+  // avec statut, dates et progression (épisodes DIFFUSÉS vus / diffusés). Le tri
+  // et les filtres (Progress) sont appliqués côté client.
+  app.get('/api/shows/library', async (request) => {
+    const now = Date.now();
+    const statuses = await prisma.userMediaStatus.findMany({
+      where: { userId: request.userId, media: { type: 'show' }, isHidden: false },
+      include: {
+        media: { include: { show: { include: { episodes: { select: { id: true, seasonNumber: true, airDate: true } } } } } },
+      },
+      orderBy: { lastWatchedAt: 'desc' },
+    });
+    const watched = await prisma.userEpisodeStatus.findMany({
+      where: { userId: request.userId, status: 'watched' },
+      select: { episodeId: true },
+    });
+    const watchedSet = new Set(watched.map((w) => w.episodeId));
+    const items = statuses.map((s) => {
+      const eps = s.media.show?.episodes ?? [];
+      const aired = eps.filter((e) => e.seasonNumber > 0 && (!e.airDate || e.airDate.getTime() <= now));
+      const watchedCount = aired.filter((e) => watchedSet.has(e.id)).length;
+      return {
+        ...serializeMedia(s.media, s),
+        progress: { watched: watchedCount, total: aired.length },
+        addedAt: s.addedAt.toISOString(),
+        lastWatchedAt: s.lastWatchedAt?.toISOString() ?? null,
+      };
+    });
+    return { items };
+  });
+
   // Fiche série.
   app.get('/api/shows/:id', async (request, reply) => {
     const { id } = request.params as { id: string };

@@ -5,6 +5,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { COLORS, FONTS } from '@/lib/theme';
+import { useTabResetStore } from '@/lib/tabReset';
 
 const ICONS: Record<string, keyof typeof Feather.glyphMap> = {
   index: 'tv',
@@ -22,6 +23,7 @@ const LABELS: Record<string, string> = {
 export function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const bumpReset = useTabResetStore((s) => s.bump);
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom, height: 56 + insets.bottom }]}>
       {state.routes.map((route, i) => {
@@ -29,9 +31,13 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
           if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-          // Re-clic sur l'onglet déjà actif : actualiser la page (façon TV Time).
-          // Invalider toutes les requêtes re-fetch celles montées à l'écran.
-          if (focused) qc.invalidateQueries();
+          // Re-clic sur l'onglet déjà actif (façon TV Time) : actualiser les
+          // données ET remonter l'écran à son état par défaut (via `bump` +
+          // `key` dans chaque écran d'onglet).
+          if (focused) {
+            qc.invalidateQueries();
+            bumpReset(route.name);
+          }
         };
         return (
           <Pressable key={route.key} style={styles.item} onPress={onPress}>

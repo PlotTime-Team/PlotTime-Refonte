@@ -7,10 +7,17 @@ import { api, tmdbImage } from '@/lib/api';
 import type { MediaDto } from '@/lib/types';
 import { COLORS } from '@/lib/theme';
 import { PillHeader, TopTabs, EmptyState, Loading, LoadError, Poster } from '@/components/ui';
+import { useTabResetSeq } from '@/lib/tabReset';
 
 type MoviesResponse = { toWatch: MediaDto[]; upcoming: { media: MediaDto; releaseDate: string }[] };
 
 export default function MoviesScreen() {
+  // Re-clic sur l'onglet « Films » : remontage complet (état + scroll par défaut).
+  const resetSeq = useTabResetSeq('movies');
+  return <MoviesScreenInner key={resetSeq} />;
+}
+
+function MoviesScreenInner() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tab, setTab] = useState('À VOIR');

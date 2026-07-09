@@ -66,6 +66,30 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
 
+### 2026-07-08 — Claude (8)
+- **Onglet HISTORIQUE retiré** (il n'existe pas dans TV Time) : l'onglet Séries
+  garde `À VOIR` / `À VENIR`, et l'**historique de visionnage réapparaît en
+  faisant défiler vers le haut** dans « À voir » (scroll initial calé sous le
+  bloc historique).
+- **Re-clic sur l'onglet actif = actualisation + retour à l'état par défaut**
+  (façon TV Time) : nouveau store `lib/tabReset.ts` ; `TabBar` incrémente un
+  compteur par onglet, chaque écran (`index`, `movies`, `explore`, `profile`)
+  se remonte via `key` → scroll et onglet interne réinitialisés.
+- **Pages profil cliquables** (avant : « rien ne se passe ») — 4 nouvelles
+  pages calquées sur TV Time, ouvertes depuis les sections du profil :
+  - **Séries** (`/library/shows`) : en-tête (retour + titre + bouton œil),
+    sections `EN COURS` / `À JOUR` / `TERMINÉ` / `PAS COMMENCÉ` / `ARRÊTÉES`,
+    grille 3 colonnes, **barre de progression jaune/verte** (épisodes diffusés),
+    bouton flottant `FILTRES` → sheet (Trier par + Progression, Réinitialiser/Appliquer).
+  - **Films** (`/library/movies`) : sections `VU` / `NON VU`, grille 3 colonnes,
+    `FILTRES` (Trier par + Avancement).
+  - **Séries préférées** / **Films préférés** : bouton jaune
+    `AJOUTER/SUPPRIMER`, `TRIER PAR Ordre de l'utilisateur`, grille, et une
+    modale de sélection (étoile) pour (dé)favoriser.
+  - Nouvel endpoint `GET /api/shows/library` (liste à plat + progression sur
+    diffusés) ; les films réutilisent `/api/movies/profile`. Composants
+    partagés `components/library.tsx`.
+
 ### 2026-07-08 — Claude (7)
 - **« Personnaliser » copié de TV Time** (séries ET films, réf. 38-40) : le
   menu « … » → Personnaliser ouvre un petit sheet « Modifier l'affiche /

@@ -9,6 +9,7 @@ import type { MediaDto, ProfileStatsDto } from '@/lib/types';
 import { watchTime } from '@/lib/format';
 import { COLORS, FONTS } from '@/lib/theme';
 import { Loading, LoadError, Poster } from '@/components/ui';
+import { useTabResetSeq } from '@/lib/tabReset';
 
 export type ProfileUser = {
   displayName: string;
@@ -32,6 +33,12 @@ type ProfileResponse = {
 };
 
 export default function ProfileScreen() {
+  // Re-clic sur l'onglet « Profil » : remontage complet (scroll par défaut).
+  const resetSeq = useTabResetSeq('profile');
+  return <ProfileScreenInner key={resetSeq} />;
+}
+
+function ProfileScreenInner() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
@@ -134,10 +141,10 @@ export default function ProfileScreen() {
         </Section>
       ) : null}
 
-      <PosterRow title="Séries" items={data.shows} emptyLabel="Aucune série suivie" />
-      <PosterRow title="Séries préférées" items={data.favoriteShows} heart emptyLabel="Aucune série en favori" />
-      <PosterRow title="Films" items={data.movies} isMovie emptyLabel="Aucun film ajouté" />
-      <PosterRow title="Films préférés" items={data.favoriteMovies} isMovie heart emptyLabel="Aucun film en favori" />
+      <PosterRow title="Séries" items={data.shows} emptyLabel="Aucune série suivie" href="/library/shows" />
+      <PosterRow title="Séries préférées" items={data.favoriteShows} heart emptyLabel="Aucune série en favori" href="/library/favorite-shows" />
+      <PosterRow title="Films" items={data.movies} isMovie emptyLabel="Aucun film ajouté" href="/library/movies" />
+      <PosterRow title="Films préférés" items={data.favoriteMovies} isMovie heart emptyLabel="Aucun film en favori" href="/library/favorite-movies" />
     </ScrollView>
   );
 }
@@ -209,17 +216,20 @@ function PosterRow({
   heart,
   isMovie,
   emptyLabel,
+  href,
 }: {
   title: string;
   items: MediaDto[];
   heart?: boolean;
   isMovie?: boolean;
   emptyLabel: string;
+  href: string;
 }) {
   const router = useRouter();
   return (
     <View style={{ paddingVertical: 16 }}>
-      <View style={styles.sectHead}>
+      {/* Toute la ligne de titre ouvre la page dédiée (façon TV Time). */}
+      <Pressable style={styles.sectHead} onPress={() => router.push(href as Parameters<typeof router.push>[0])}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {heart ? (
             // Pastille rouge + cœur blanc AVANT le titre, comme TV Time.
@@ -230,7 +240,7 @@ function PosterRow({
           <Text style={styles.sectTitle}>{title}</Text>
         </View>
         <Feather name="chevron-right" size={24} color={COLORS.black} />
-      </View>
+      </Pressable>
       {items.length === 0 ? (
         // Section toujours visible façon TV Time, avec un état vide.
         <View style={styles.emptyRow}>

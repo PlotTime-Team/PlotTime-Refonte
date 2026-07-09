@@ -58,6 +58,10 @@ export default function RootLayout() {
             <Stack.Screen name="user/[id]" />
             <Stack.Screen name="profile/edit" />
             <Stack.Screen name="profile/cover" />
+            <Stack.Screen name="library/shows" />
+            <Stack.Screen name="library/movies" />
+            <Stack.Screen name="library/favorite-shows" />
+            <Stack.Screen name="library/favorite-movies" />
             <Stack.Screen name="import" />
           </Stack>
         </QueryClientProvider>

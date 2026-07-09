@@ -8,6 +8,7 @@ import { api, tmdbImage } from '@/lib/api';
 import { useDebounced } from '@/lib/useDebounced';
 import { COLORS, FONTS } from '@/lib/theme';
 import { EmptyState, Loading } from '@/components/ui';
+import { useTabResetSeq } from '@/lib/tabReset';
 
 type FeedItem = {
   id: string | null;
@@ -36,6 +37,12 @@ type PublicUser = { id: string; displayName: string; avatarUrl: string | null; i
 const PASTELS = ['#F5EFDC', '#DDE7EE', '#EFE0E0', '#E3EEDD'];
 
 export default function ExploreScreen() {
+  // Re-clic sur l'onglet « Explorer » : remontage complet (recherche + flux réinitialisés).
+  const resetSeq = useTabResetSeq('explore');
+  return <ExploreScreenInner key={resetSeq} />;
+}
+
+function ExploreScreenInner() {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<'media' | 'users'>('media');
