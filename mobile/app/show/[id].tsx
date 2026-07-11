@@ -12,6 +12,7 @@ import { COLORS, RADIUS, SHADOW, FONTS } from '@/lib/theme';
 import { TopTabs, CheckCircle, Loading, LoadError, EmptyState } from '@/components/ui';
 import { AnimatedFill, Pop, SlideUpBar, FadeSwitch, PressableScale } from '@/components/anim';
 import { Stars } from '@/components/Stars';
+import { MarkPreviousPopup, hasUnwatchedPrevious } from '@/components/MarkPreviousPopup';
 import { genresFr, statusFr, airDayFr, compactCount } from '@/lib/frMedia';
 
 const INTEREST = ['LES ACTEURS', 'LA PRÉMISSE', 'LES CRÉATEURS', 'LA CHAÎNE/LA PLATEFORME', "LA FRANCHISE OU L'UNIVERS", 'AUTRE'];
@@ -976,6 +977,9 @@ function EpThumb({ stillPath, fallback }: { stillPath?: string | null; fallback?
 function EpisodesTab({ showId, posterPath, onChange, onScroll }: { showId: string; posterPath?: string | null; onChange: () => void; onScroll?: any }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState<Record<number, boolean>>({});
+  // Pop-up « Cocher aussi les épisodes précédents ? » : proposée quand on
+  // coche un épisode alors que des épisodes antérieurs diffusés sont non vus.
+  const [prevAsk, setPrevAsk] = useState<EpisodeDto | null>(null);
   // Snackbar « Marquer tout comme non vu » (2ᵉ appui sur la coche maîtresse).
   const [confirmUnmark, setConfirmUnmark] = useState(false);
   useEffect(() => {
@@ -1045,6 +1049,41 @@ function EpisodesTab({ showId, posterPath, onChange, onScroll }: { showId: strin
     },
     onSettled: refresh,
   });
+  // OUI de la pop-up : coche tous les épisodes diffusés situés AVANT celui
+  // choisi (saisons antérieures comprises, spéciaux exclus) — consentement
+  // explicite de l'utilisateur, reflété immédiatement dans la liste.
+  const markPrevious = useMutation({
+    mutationFn: (ep: EpisodeDto) => api.post(`/api/episodes/${ep.id}/watched-previous`),
+    onMutate: async (ep: EpisodeDto) => {
+      await qc.cancelQueries({ queryKey: ['show', showId, 'episodes'] });
+      const prev = qc.getQueryData<EpisodesData>(['show', showId, 'episodes']);
+      if (prev) {
+        const isBefore = (e: EpisodeDto) =>
+          e.seasonNumber < ep.seasonNumber ||
+          (e.seasonNumber === ep.seasonNumber && e.episodeNumber < ep.episodeNumber);
+        qc.setQueryData<EpisodesData>(['show', showId, 'episodes'], {
+          nextEpisode: prev.nextEpisode,
+          seasons: prev.seasons.map((s) => {
+            if (s.seasonNumber <= 0) return s;
+            const episodes = s.episodes.map((e) =>
+              !e.watched && isBefore(e) && !isUpcoming(e.airDate) ? { ...e, watched: true } : e,
+            );
+            return { ...s, episodes, watchedCount: episodes.filter((e) => e.watched).length };
+          }),
+        });
+      }
+      return { prev };
+    },
+    onError: (_err: unknown, _ep: EpisodeDto, ctx?: { prev?: EpisodesData }) => {
+      if (ctx?.prev) qc.setQueryData(['show', showId, 'episodes'], ctx.prev);
+    },
+    onSettled: refresh,
+  });
+  // Coche d'un épisode : bascule + proposition de cocher les précédents.
+  const pressEp = (e: EpisodeDto) => {
+    if (!e.watched && data && hasUnwatchedPrevious(data.seasons, e)) setPrevAsk(e);
+    toggleEp.mutate(e);
+  };
   // Tout démarquer (hors spéciaux quand aucune saison précise), avec la même
   // mise à jour optimiste que « tout marquer ».
   const markAllUnwatched = useMutation({
@@ -1182,7 +1221,7 @@ function EpisodesTab({ showId, posterPath, onChange, onScroll }: { showId: strin
                                 <Text style={styles.daysLabel}>{daysUntil(e.airDate) > 1 ? 'JOURS' : 'JOUR'}</Text>
                               </View>
                             ) : (
-                              <CheckCircle size={44} checked={e.watched} onPress={() => toggleEp.mutate(e)} />
+                              <CheckCircle size={44} checked={e.watched} onPress={() => pressEp(e)} />
                             )}
                           </View>
                         </View>
@@ -1203,6 +1242,12 @@ function EpisodesTab({ showId, posterPath, onChange, onScroll }: { showId: strin
           <Text style={styles.unmarkText}>Marquer tout comme non vu</Text>
         </Pressable>
       ) : null}
+
+      <MarkPreviousPopup
+        visible={!!prevAsk}
+        onYes={() => { if (prevAsk) markPrevious.mutate(prevAsk); setPrevAsk(null); }}
+        onNo={() => setPrevAsk(null)}
+      />
     </View>
   );
 }

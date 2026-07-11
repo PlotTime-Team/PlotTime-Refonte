@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../db/client.js';
 import { requireAuth } from '../auth/routes.js';
 import { serializeEpisode } from '../media/serialize.js';
-import { markEpisodeUnwatched, markEpisodeWatched } from '../media/actions.js';
+import { createWatchEvent, markEpisodeUnwatched, markEpisodeWatched, recalculateShowStatus } from '../media/actions.js';
 
 export async function episodeRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
@@ -41,6 +41,43 @@ export async function episodeRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'not_aired_yet' });
     await markEpisodeWatched(request.userId, id, body.watchedAt ? new Date(body.watchedAt) : new Date());
     return { ok: true };
+  });
+
+  // Pop-up « Cocher aussi les épisodes précédents ? » (règle produit) : c'est
+  // le SEUL cas où des épisodes sont cochés sans action directe de
+  // l'utilisateur — et uniquement après son OUI explicite. Marque comme vus
+  // tous les épisodes réguliers DIFFUSÉS situés avant celui-ci (saisons
+  // antérieures comprises) ; les spéciaux (saison 0) ne sont jamais touchés.
+  app.post('/api/episodes/:id/watched-previous', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const target = await prisma.episode.findUnique({ where: { id }, include: { show: true } });
+    if (!target) return reply.code(404).send({ error: 'not_found' });
+    const now = new Date();
+    const episodes = await prisma.episode.findMany({
+      where: {
+        showId: target.showId,
+        seasonNumber: { gt: 0 },
+        OR: [{ airDate: null }, { airDate: { lte: now } }],
+      },
+    });
+    const previous = episodes.filter(
+      (e) =>
+        e.seasonNumber < target.seasonNumber ||
+        (e.seasonNumber === target.seasonNumber && e.episodeNumber < target.episodeNumber),
+    );
+    for (const ep of previous) {
+      await prisma.userEpisodeStatus.upsert({
+        where: { userId_episodeId: { userId: request.userId, episodeId: ep.id } },
+        create: { userId: request.userId, episodeId: ep.id, status: 'watched', watchedAt: now },
+        update: { status: 'watched', watchedAt: now },
+      });
+    }
+    await createWatchEvent(request.userId, target.show.mediaId, 'watched', {
+      markPrevious: true,
+      until: { seasonNumber: target.seasonNumber, episodeNumber: target.episodeNumber },
+    });
+    await recalculateShowStatus(request.userId, target.showId, now);
+    return { ok: true, count: previous.length };
   });
 
   app.post('/api/episodes/:id/unwatched', async (request, reply) => {

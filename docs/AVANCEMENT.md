@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-11** (Claude) — Onglet Séries : pastilles de section flottantes + fenêtre épisode façon TV Time (swipe latéral entre épisodes)
+Dernière mise à jour : **2026-07-11** (Claude) — Pop-up « Cocher aussi les épisodes précédents ? » (fiche + fenêtre épisode) ; rappel de la règle : jamais de coche sans action de l'utilisateur
 
 ---
 
@@ -65,6 +65,23 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 ## Journal des modifications
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
+
+### 2026-07-11 — Claude (3)
+- **Pop-up « Cocher aussi les épisodes précédents ? »** (règle produit,
+  demande d'Étienne) : en cochant un épisode (ex. S02E03) alors que des
+  épisodes ANTÉRIEURS diffusés ne sont pas vus, une mini pop-up propose de les
+  cocher aussi. **OUI** → toutes les saisons précédentes + les épisodes
+  antérieurs de la saison en cours sont cochés (S1 entière + S2E01-02 dans
+  l'exemple) ; **NON** → seul l'épisode coché l'est. Spéciaux (saison 0) et
+  épisodes non diffusés jamais touchés. C'est le SEUL cas où des épisodes se
+  cochent sans geste direct de l'utilisateur — et uniquement après son OUI.
+  - Serveur : `POST /api/episodes/:id/watched-previous` (+ recalcul du statut
+    de la série, événement agrégé) — **testé** (72 tests verts).
+  - Mobile : pop-up animée (composant partagé) branchée sur la fiche (onglet
+    Épisodes) ET la fenêtre épisode ; pas de pop-up en cochant depuis la file
+    « À voir » (l'épisode proposé est toujours le prochain, sans précédent non vu).
+  - Vérifié au navigateur (6/6) : pop-up à la coche d'E3, OUI → E1+E2+E3 en
+    base et compteur 3/4 à l'écran, NON → seul E3, pas de pop-up sur E1.
 
 ### 2026-07-11 — Claude (2)
 - **Onglet Séries : pastilles de section FLOTTANTES** (copie TV Time) : la

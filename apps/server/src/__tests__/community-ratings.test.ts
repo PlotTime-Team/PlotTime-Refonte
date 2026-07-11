@@ -48,12 +48,13 @@ beforeAll(async () => {
   });
   mediaId = media.id;
   const show = await prisma.show.findFirstOrThrow({ where: { mediaId } });
-  for (const [season, episode] of [
+  const plan: [number, number][] = [
     [1, 1],
     [1, 2],
     [2, 1],
     [0, 1],
-  ]) {
+  ];
+  for (const [season, episode] of plan) {
     const ep = await prisma.episode.create({
       data: {
         showId: show.id,
@@ -94,12 +95,12 @@ describe('Notes de la communauté (graphe de la fiche)', () => {
         payload: { rating },
         headers: { authorization: `Bearer ${token}` },
       });
-    expect((await rate(tokenA, episodeIds[0], 4)).statusCode).toBe(200);
-    expect((await rate(tokenB, episodeIds[0], 2)).statusCode).toBe(200);
-    expect((await rate(tokenA, episodeIds[1], 5)).statusCode).toBe(200);
-    expect((await rate(tokenB, episodeIds[2], 1)).statusCode).toBe(200);
+    expect((await rate(tokenA, episodeIds[0]!, 4)).statusCode).toBe(200);
+    expect((await rate(tokenB, episodeIds[0]!, 2)).statusCode).toBe(200);
+    expect((await rate(tokenA, episodeIds[1]!, 5)).statusCode).toBe(200);
+    expect((await rate(tokenB, episodeIds[2]!, 1)).statusCode).toBe(200);
     // Une note sur un épisode spécial ne doit pas apparaître dans le graphe.
-    expect((await rate(tokenA, episodeIds[3], 5)).statusCode).toBe(200);
+    expect((await rate(tokenA, episodeIds[3]!, 5)).statusCode).toBe(200);
 
     const res = await app.inject({
       method: 'GET',

@@ -13,6 +13,7 @@ import { episodeCode } from '@/lib/format';
 import { COLORS, FONTS } from '@/lib/theme';
 import { CheckCircle } from '@/components/ui';
 import { Stars } from '@/components/Stars';
+import { MarkPreviousPopup, hasUnwatchedPrevious } from '@/components/MarkPreviousPopup';
 import { useReduceMotion } from '@/lib/useReduceMotion';
 
 // Fenêtre « fiche épisode » (copie TV Time) ouverte depuis les cartes de
@@ -130,6 +131,7 @@ export function EpisodeSheet({ target, onClose }: { target: EpisodeSheetTarget |
                 mediaId={target.mediaId}
                 mediaTitle={target.mediaTitle}
                 posterPath={target.posterPath}
+                seasons={episodesQ.data?.seasons ?? []}
                 onClose={onClose}
                 bottomPad={insets.bottom + 24}
               />
@@ -159,17 +161,20 @@ function Dots({ total, index }: { total: number; index: number }) {
 // Une page épisode : blocs blancs sur fond gris (cotes calées sur les captures
 // TV Time : code 30, date 17, titres de section 20, synopsis 16/23).
 function EpisodePage({
-  episode, mediaId, mediaTitle, posterPath, onClose, bottomPad,
+  episode, mediaId, mediaTitle, posterPath, seasons, onClose, bottomPad,
 }: {
   episode: EpisodeDto;
   mediaId: string;
   mediaTitle: string;
   posterPath?: string | null;
+  seasons: SeasonData[];
   onClose: () => void;
   bottomPad: number;
 }) {
   const router = useRouter();
   const qc = useQueryClient();
+  // Pop-up « Cocher aussi les épisodes précédents ? » (si non vus avant celui-ci).
+  const [askPrev, setAskPrev] = useState(false);
 
   // Plateformes : même cache que la fiche série (chargée en arrière-plan).
   const detail = useQuery({
@@ -219,6 +224,41 @@ function EpisodePage({
       qc.invalidateQueries({ queryKey: ['profile'] });
     },
   });
+  // OUI de la pop-up : coche tous les épisodes diffusés avant celui-ci
+  // (saisons antérieures comprises, spéciaux exclus).
+  const markPrevious = useMutation({
+    mutationFn: () => api.post(`/api/episodes/${episode.id}/watched-previous`),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['show', mediaId, 'episodes'] });
+      const prev = qc.getQueryData<EpisodesData>(['show', mediaId, 'episodes']);
+      if (prev) {
+        const isBefore = (e: EpisodeDto) =>
+          e.seasonNumber < episode.seasonNumber ||
+          (e.seasonNumber === episode.seasonNumber && e.episodeNumber < episode.episodeNumber);
+        qc.setQueryData<EpisodesData>(['show', mediaId, 'episodes'], {
+          ...prev,
+          seasons: prev.seasons.map((s) =>
+            s.seasonNumber <= 0
+              ? s
+              : { ...s, episodes: s.episodes.map((e) => (!e.watched && isBefore(e) && isAired(e) ? { ...e, watched: true } : e)) },
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e: unknown, _v: void, ctx?: { prev?: EpisodesData }) => {
+      if (ctx?.prev) qc.setQueryData(['show', mediaId, 'episodes'], ctx.prev);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['shows'] });
+      qc.invalidateQueries({ queryKey: ['show', mediaId, 'episodes'] });
+      qc.invalidateQueries({ queryKey: ['profile'] });
+    },
+  });
+  const pressCheck = () => {
+    if (!episode.watched && hasUnwatchedPrevious(seasons, episode)) setAskPrev(true);
+    toggle.mutate(episode);
+  };
 
   const share = () => {
     const message = `« ${mediaTitle} » ${episodeCode(episode.seasonNumber, episode.episodeNumber)} — suivi avec SerieTime 📺`;
@@ -281,7 +321,7 @@ function EpisodePage({
             <Text style={styles.metaText}>{episode.watched ? 'Vu' : 'Pas vu'}</Text>
           </View>
           <View style={{ flex: 1 }} />
-          <CheckCircle size={46} checked={episode.watched} onPress={() => toggle.mutate(episode)} />
+          <CheckCircle size={46} checked={episode.watched} onPress={pressCheck} />
         </View>
       </View>
 
@@ -328,6 +368,12 @@ function EpisodePage({
           <Feather name="chevron-right" size={24} color={COLORS.black} />
         </View>
       </Pressable>
+
+      <MarkPreviousPopup
+        visible={askPrev}
+        onYes={() => { setAskPrev(false); markPrevious.mutate(); }}
+        onNo={() => setAskPrev(false)}
+      />
     </ScrollView>
   );
 }
