@@ -190,7 +190,7 @@ export function TikTokFeed() {
           keyExtractor={(c) => c.key}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingHorizontal: 14 }}
+          contentContainerStyle={{ gap: 6, paddingHorizontal: 10 }}
           renderItem={({ item: c }) => (
             <Pressable
               style={[styles.chip, cat === c.key && styles.chipOn]}
@@ -238,9 +238,10 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#000' },
   emptyWrap: { flex: 1, backgroundColor: COLORS.white },
   top: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  chip: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  // Compact : les 5 catégories (dont JEUX) tiennent sur un écran 360dp sans coupure.
+  chip: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 },
   chipOn: { backgroundColor: COLORS.yellow },
-  chipText: { fontFamily: FONTS.extraBold, fontSize: 13, letterSpacing: 0.4, color: '#fff' },
+  chipText: { fontFamily: FONTS.extraBold, fontSize: 12, letterSpacing: 0.2, color: '#fff' },
   chipTextOn: { color: COLORS.black },
   commentBar: {
     position: 'absolute',

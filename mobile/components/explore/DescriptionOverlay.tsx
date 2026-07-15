@@ -12,6 +12,11 @@ type DetailInfo = {
   cast?: { name: string }[];
   providers?: { name: string }[];
   creators?: string[];
+  // Fiche JEU (GET /api/games/:id) — champs à plat.
+  platforms?: string | null;
+  developer?: string | null;
+  publisher?: string | null;
+  gameModes?: string | null;
 };
 
 function InfoLine({ label, value }: { label: string; value?: string }) {
@@ -49,7 +54,11 @@ export function DescriptionOverlay({
       try {
         const mediaId = await resolveMedia(item);
         const d = await api.get<DetailInfo>(
-          item.type === 'movie' ? `/api/movies/${mediaId}` : `/api/shows/${mediaId}`,
+          item.igdbId
+            ? `/api/games/${mediaId}`
+            : item.type === 'movie'
+              ? `/api/movies/${mediaId}`
+              : `/api/shows/${mediaId}`,
         );
         if (!cancelled) setInfo(d);
       } catch {
@@ -63,9 +72,10 @@ export function DescriptionOverlay({
     };
   }, [visible, item, resolveMedia]);
 
+  const isGame = Boolean(item.igdbId);
   const meta = [
     item.year,
-    item.category === 'anime' ? 'Animé' : item.type === 'show' ? 'Série' : 'Film',
+    isGame ? 'Jeu' : item.category === 'anime' ? 'Animé' : item.type === 'show' ? 'Série' : 'Film',
   ]
     .filter(Boolean)
     .join(' · ');
@@ -76,7 +86,9 @@ export function DescriptionOverlay({
         <Feather name="chevron-down" size={26} color="#fff" />
       </Pressable>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 4, paddingBottom: 18 }}
+        // Padding bas généreux : la barre « Ajouter un commentaire » du flux reste
+        // affichée par-dessus — sans lui, « VOIR LA FICHE » passait dessous.
+        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 4, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{item.title}</Text>
@@ -86,14 +98,25 @@ export function DescriptionOverlay({
           <ActivityIndicator style={{ marginTop: 16, alignSelf: 'flex-start' }} color="#fff" />
         ) : info ? (
           <View style={{ marginTop: 14, gap: 8 }}>
-            <InfoLine label="Genres" value={info.media?.genres ?? undefined} />
-            <InfoLine
-              label={item.type === 'movie' ? 'Réalisation' : 'Création'}
-              value={info.creators?.join(', ')}
-            />
-            <InfoLine label="Diffusion" value={info.show?.network ?? info.show?.platform ?? undefined} />
-            <InfoLine label="Casting" value={info.cast?.slice(0, 6).map((c) => c.name).join(', ')} />
-            <InfoLine label="Où regarder" value={info.providers?.map((p) => p.name).join(', ')} />
+            {isGame ? (
+              <>
+                <InfoLine label="Plateformes" value={info.platforms ?? undefined} />
+                <InfoLine label="Développeur" value={info.developer ?? undefined} />
+                <InfoLine label="Éditeur" value={info.publisher ?? undefined} />
+                <InfoLine label="Modes" value={info.gameModes ?? undefined} />
+              </>
+            ) : (
+              <>
+                <InfoLine label="Genres" value={info.media?.genres ?? undefined} />
+                <InfoLine
+                  label={item.type === 'movie' ? 'Réalisation' : 'Création'}
+                  value={info.creators?.join(', ')}
+                />
+                <InfoLine label="Diffusion" value={info.show?.network ?? info.show?.platform ?? undefined} />
+                <InfoLine label="Casting" value={info.cast?.slice(0, 6).map((c) => c.name).join(', ')} />
+                <InfoLine label="Où regarder" value={info.providers?.map((p) => p.name).join(', ')} />
+              </>
+            )}
           </View>
         ) : null}
         <Pressable style={styles.ficheBtn} onPress={() => onOpenFiche(item)}>
