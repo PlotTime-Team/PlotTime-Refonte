@@ -7,6 +7,7 @@ import {
   FlatList,
   Image as RNImage,
   ActivityIndicator,
+  RefreshControl,
   type ViewToken,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -33,6 +34,7 @@ export function TikTokFeed() {
   const [extra, setExtra] = useState<FeedItem[]>([]); // pages ajoutées (flux infini)
   const [commentsFor, setCommentsFor] = useState<FeedItem | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0); // carte actuellement à l'écran
   const dryRef = useRef(0); // nombre de fetchs consécutifs sans nouveauté
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
@@ -46,6 +48,9 @@ export function TikTokFeed() {
     () => (cat === 'tout' ? all : all.filter((f) => catOf(f) === cat)),
     [all, cat],
   );
+  // Le deck courant, lu par les callbacks stables (onViewable) sans closure périmée.
+  const deckRef = useRef(deck);
+  deckRef.current = deck;
 
   const invalidateLibrary = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['shows'] });
@@ -74,15 +79,27 @@ export function TikTokFeed() {
     }
   }, [all, loadingMore]);
 
-  // Prefetch des 2 backdrops suivants pour un snap fluide.
+  // Suit la carte active + prefetch des 2 backdrops suivants pour un snap fluide.
+  // Callback stable (RN interdit de le changer entre les rendus) : lit deckRef.
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const idx = viewableItems[0]?.index ?? 0;
+    setActiveIndex(idx);
+    const d = deckRef.current;
     for (let i = idx + 1; i <= idx + 2; i++) {
-      const it = deck[i];
+      const it = d[i];
       const uri = it && (tmdbImage(it.backdropPath, 'w780') ?? tmdbImage(it.posterPath, 'w500'));
       if (uri) RNImage.prefetch(uri);
     }
   }).current;
+
+  // Tirer-pour-actualiser : nouveau tirage complet, on repart du haut.
+  const onRefresh = useCallback(async () => {
+    dryRef.current = 0;
+    setExtra([]);
+    await refetch();
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    setActiveIndex(0);
+  }, [refetch]);
 
   const advance = useCallback(
     (index: number) => {
@@ -112,6 +129,7 @@ export function TikTokFeed() {
           onEndReached={loadMore}
           onViewableItemsChanged={onViewable}
           viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor="#fff" colors={[COLORS.yellow]} />}
           renderItem={({ item, index }) => (
             <TikTokCard
               item={item}
@@ -130,8 +148,9 @@ export function TikTokFeed() {
         </View>
       ) : null}
 
-      {/* Barre de recherche + filtres catégories, en surimpression haute. */}
-      <View style={[styles.top, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
+      {/* Filtres catégories, en surimpression haute (la barre de recherche est
+          au-dessus dans la coquille explore.tsx et gère déjà la zone sûre). */}
+      <View style={[styles.top, { paddingTop: 10 }]} pointerEvents="box-none">
         <FlatList
           data={FEED_CATEGORIES}
           keyExtractor={(c) => c.key}
@@ -152,13 +171,12 @@ export function TikTokFeed() {
         />
       </View>
 
-      {/* Barre « Ajouter un commentaire » (comme TikTok). */}
+      {/* Barre « Ajouter un commentaire » (comme TikTok) : cible la carte active. */}
       {deck.length > 0 ? (
         <Pressable
-          style={[styles.commentBar, { bottom: 12 }]}
+          style={[styles.commentBar, { bottom: insets.bottom + 12 }]}
           onPress={() => {
-            const idx = 0;
-            const current = deck[idx];
+            const current = deck[activeIndex];
             if (current) setCommentsFor(current);
           }}
         >
