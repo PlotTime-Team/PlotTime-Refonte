@@ -74,10 +74,15 @@ export function PullToRefreshView({
 
   const pan = useRef(
     PanResponder.create({
-      // Ne vole le geste que si l'enfant est tout en haut et qu'on tire clairement
-      // vers le bas (les gestes verticaux vers le haut = paging restent à l'enfant).
+      // Ne vole le geste que si l'enfant est tout en haut et qu'on tire NETTEMENT
+      // vers le bas : zone morte large (16 px) + trajectoire clairement verticale
+      // (ratio 2.5) + jamais pendant une actualisation. Sinon la moindre amorce
+      // de swipe était capturée → swipes « fantômes » et paging qui accroche.
       onMoveShouldSetPanResponderCapture: (_e, g) =>
-        scrollYRef.current <= 0 && g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx) * 1.6,
+        !refreshingRef.current &&
+        scrollYRef.current <= 1 &&
+        g.dy > 16 &&
+        g.dy > Math.abs(g.dx) * 2.5,
       onPanResponderMove: (_e, g) => {
         // Résistance élastique : plus on tire, moins ça avance (effet ressort).
         const d = g.dy <= 0 ? 0 : MAX * (1 - Math.exp(-g.dy / 140));

@@ -150,6 +150,14 @@ export function TikTokFeed() {
             onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
               scrollY.current = e.nativeEvent.contentOffset.y;
             }}
+            // Position finale fiable après snap/momentum (onScroll throttlé peut
+            // rater la dernière frame → le pull-to-refresh volait des swipes).
+            onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              scrollY.current = e.nativeEvent.contentOffset.y;
+            }}
+            onScrollEndDrag={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              scrollY.current = e.nativeEvent.contentOffset.y;
+            }}
             onEndReachedThreshold={0.5}
             onEndReached={loadMore}
             onViewableItemsChanged={onViewable}

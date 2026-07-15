@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, Platform } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
@@ -30,6 +30,10 @@ export function TikTokCard({
 }) {
   const router = useRouter();
   const [detail, setDetail] = useState(false);
+  // Une action réseau à la fois par carte : un double-tap rapide sur ❤️/👁 (ou
+  // ❤️ puis 👁 pendant l'appel) déclenchait deux mutations concurrentes → états
+  // et compteurs incohérents, impressions de « rollback ».
+  const actionPending = useRef(false);
   // État optimiste local, initialisé depuis les stats serveur.
   const [state, setState] = useState<RailState>({
     liked: item.me?.liked ?? false,
@@ -66,6 +70,8 @@ export function TikTokCard({
   // porte que l'état posé dans cette session. Statut unique côté serveur : passer
   // en « à voir » annule un éventuel « déjà vu ». Optimiste avec rollback.
   const onLike = async () => {
+    if (actionPending.current) return;
+    actionPending.current = true;
     const prev = state;
     const wasLiked = prev.liked;
     setState({
@@ -89,12 +95,16 @@ export function TikTokCard({
       onInvalidateLibrary();
     } catch {
       setState(prev);
+    } finally {
+      actionPending.current = false;
     }
   };
 
   // Déjà vu = « vu » (completed), vrai TOGGLE réversible. Passer en « déjà vu »
   // annule un éventuel « à voir » ; untrack pour dé-marquer.
   const onWatched = async () => {
+    if (actionPending.current) return;
+    actionPending.current = true;
     const prev = state;
     const wasWatched = prev.watched;
     setState({
@@ -121,15 +131,21 @@ export function TikTokCard({
       onInvalidateLibrary();
     } catch {
       setState(prev);
+    } finally {
+      actionPending.current = false;
     }
   };
 
   const onDislike = async () => {
+    if (actionPending.current) return;
+    actionPending.current = true;
     try {
       const id = await resolveMedia(item);
       await api.post(`/api/disliked/${id}`, { hidden: true });
     } catch {
       /* best-effort */
+    } finally {
+      actionPending.current = false;
     }
     onDisliked(); // avance à la carte suivante (comportement « pas intéressé » TikTok)
   };
