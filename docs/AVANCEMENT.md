@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-15** (Claude) — Explorer refondu en flux TikTok plein écran (branchement de `TikTokFeed`, suppression de l'ancien Explorer PARCOURIR/DÉCOUVRIR)
+Dernière mise à jour : **2026-07-15** (Claude) — Jeux vidéo : notifications de sortie + journal V1 (Task 10)
 
 ---
 
@@ -45,6 +45,13 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Hébergement VPS | ✅ Fait | Prod sur le VPS Hostinger de Benjamin : `https://serietime.studio-vives.fr` (Docker isolé, HTTPS Let's Encrypt, backup DB nocturne) |
 | Web app (navigateur / écran d'accueil) | ✅ Fait | Export Expo web servi par Nginx à la racine du domaine (`/api` proxifié) ; utilisable iPhone + Android sans store |
 | Distribution native (APK / stores) | ⏳ Optionnel | EAS Build documenté dans le README ; la web app couvre déjà l'usage quotidien |
+| Jeux vidéo — modèle de données | ✅ Fait | Table `Game` (plateformes, développeur, éditeur, modes, Steam App ID, DLC) + `Media.igdbId` + `UserMediaStatus.playtimeMinutes` (migration `add_games`) |
+| Jeux vidéo — provider IGDB | ✅ Fait | `apps/server/src/services/igdb/` : auth Twitch (client credentials, cache mémoire), requêtes Apicalypse avec cache `ApiCache`, mapper `igdbToMedia` |
+| Jeux vidéo — module API | ✅ Fait | `apps/server/src/modules/games/routes.ts` : `GET /api/games/search`, `POST /api/games/add-from-igdb`, `GET /api/games` (bibliothèque groupée par statut wishlist/playing/completed/abandoned), `POST /api/games/:id/status`, `GET /api/games/:id` (enrichissement paresseux), `GET /api/games/discover`, `GET /api/games/upcoming`, `POST /api/games/steam/import`, `DELETE /api/games/:id/tracking` |
+| Jeux vidéo — onglet Jeux (mobile) | ✅ Fait | `mobile/app/(tabs)/games.tsx` : bibliothèque par statut, recherche IGDB, carrousels « Populaires »/« À venir » (découverte, tap = ajoute + ouvre la fiche), « Sorties à venir » (jeux suivis, groupés par mois) |
+| Jeux vidéo — connexion Steam (mobile) | ✅ Fait | Bloc « Jeux — Steam » dans `mobile/app/settings.tsx` (onglet Compte) : SteamID/URL de profil → import bibliothèque possédée |
+| Jeux vidéo — fiche jeu (mobile) | ✅ Fait | `mobile/app/game/[id].tsx` : miroir simplifié de la fiche série (jaquette, infos, sélecteur de statut wishlist/playing/completed/abandoned, temps de jeu, commentaires), suivi optimiste avec rollback |
+| Jeux vidéo — notifications de sortie | ✅ Fait | Passe du worker de fond (`apps/server/src/services/sync-worker.ts`) : `Notification` de type `game_release` quand `Media.releaseDate` d'un jeu suivi (non masqué) tombe aujourd'hui, dédupliquée par `(userId, mediaId, type)` |
 
 ## Prochaines étapes (par priorité)
 
@@ -65,6 +72,64 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 ## Journal des modifications
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
+
+### 2026-07-15 — Onglet Jeux vidéo (V1)
+- Domaine jeux calqué sur séries : Media.type=game + sous-table Game + provider IGDB + module games + UserMediaStatus (Voulus/En cours/Terminés/Abandonnés, temps de jeu).
+- Fiche jeu, recherche/ajout IGDB, découverte (populaires/à venir), sorties & DLC à venir, import bibliothèque Steam, notifications de sortie.
+- Config : TWITCH_CLIENT_ID/SECRET (IGDB), STEAM_API_KEY. HowLongToBeat & PlayStation = V2.
+- Notifications de sortie (Task 10) : passe ajoutée au worker de fond
+  (`apps/server/src/services/sync-worker.ts`, fonction
+  `notifyGameReleasesToday`, appelée à chaque `tick()`) — pour chaque
+  `UserMediaStatus` d'un jeu suivi (non masqué) dont `Media.releaseDate`
+  tombe aujourd'hui (bornes `setHours(0,0,0,0)` → +24h), crée une
+  `Notification` (`type: 'game_release'`, titre « <titre> sort aujourd'hui »),
+  même schéma que les notifications sociales (`modules/social/notify.ts` :
+  `userId`/`type`/`title`/`date`/`metadataJson`). Dédup `(userId, mediaId,
+  type)` via une recherche `contains` sur `metadataJson` (pas de colonne
+  `mediaId` dédiée sur `Notification`). Passe légère, hors chemin critique des
+  requêtes utilisateur.
+- Typecheck serveur : 0 erreur. Suite complète : 80/80 sans régression.
+
+### 2026-07-15 — Jeux vidéo : découverte + à venir + connexion Steam (Task 9)
+- `mobile/app/(tabs)/games.tsx` : sous la bibliothèque, sections **« Sorties à
+  venir »** (jeux suivis dont la sortie n'est pas passée, `GET
+  /api/games/upcoming`, groupés par mois, carrousel horizontal, tap → fiche)
+  et **« Populaires » / « À venir »** (découverte IGDB, `GET
+  /api/games/discover`, carrousel horizontal, tap = ajoute en « Voulus » via
+  `POST /api/games/add-from-igdb` puis ouvre la fiche, overlay de chargement
+  sur la jaquette). La découverte est désormais toujours visible (avant :
+  seulement en repli bibliothèque vide) — un seul rendu, jamais dupliqué.
+- `mobile/app/settings.tsx` (onglet Compte, section « Jeux — Steam ») :
+  `TextInput` SteamID/URL de profil + bouton « Importer ma bibliothèque » →
+  `POST /api/games/steam/import`, affiche « N jeux importés » ou l'erreur
+  (`steam_id_invalide` → message profil public requis) ; invalide
+  `['games','library']` au succès.
+- Typecheck mobile : 0 erreur.
+
+### 2026-07-15 — Jeux vidéo : module API games (Task 4)
+- `apps/server/src/modules/games/routes.ts` : routes `GET /api/games/search`
+  (recherche IGDB), `POST /api/games/add-from-igdb` (ajout par id IGDB, statut
+  optionnel), `GET /api/games` (bibliothèque groupée par statut wishlist/
+  playing/completed/abandoned), `POST /api/games/:id/status` (changement de
+  statut), `GET /api/games/:id` (détail, enrichissement paresseux si jamais
+  synchronisé), `DELETE /api/games/:id/tracking`.
+- Helper `ensureGameFromIgdb(igdbId)` (miroir de `ensureMediaFromTmdb`) :
+  crée/met à jour `Media`(type `game`) + `Game` à partir d'IGDB ; renvoie
+  l'existant sans erreur si IGDB est hors-ligne/quota dépassé.
+- Module enregistré dans `apps/server/src/app.ts` (`await
+  app.register(gamesRoutes)`).
+- TDD : test `apps/server/src/__tests__/games.test.ts` (bibliothèque groupée
+  par statut + changement de statut), suite complète 78/78 sans régression.
+- Prépare la tâche suivante : UI mobile de suivi des jeux.
+
+### 2026-07-15 — Jeux vidéo : modèle de données (Task 1)
+- Migration Prisma additive `add_games` : nouvelle table `Game` (mediaId
+  unique, `platforms`/`developer`/`publisher`/`gameModes`/`steamAppId`,
+  `isDlc`, `parentGameId` → relation nommée `GameDlc` vers `Media`), colonne
+  `Media.igdbId` et colonne `UserMediaStatus.playtimeMinutes`. Aucune donnée
+  existante touchée (ALTER TABLE ADD COLUMN nullable + CREATE TABLE).
+- Prépare les tâches suivantes : provider IGDB, module API `/api/games`, UI
+  mobile de suivi des jeux.
 
 ### 2026-07-15 — Explorer refondu en flux TikTok
 - Explorer unique plein écran, défilement vertical paginé (suppression de PARCOURIR + deck Tinder).
