@@ -12,11 +12,13 @@ import { Pop, PressableScale, SlideUpBar } from '@/components/anim';
 import { Stars } from '@/components/Stars';
 import { shareMedia } from '@/lib/share';
 import { FicheSkeleton } from '@/components/FicheSkeleton';
+import { ReportModal } from '@/components/ReportModal';
 import { shortDateFr } from '@/lib/format';
 
 // Miroir de la réponse GET /api/games/:id (serveur : apps/server/src/modules/games/routes.ts).
 type GameDetailDto = {
   id: string;
+  igdbId: string | null;
   title: string;
   posterPath: string | null;
   year: number | null;
@@ -49,10 +51,13 @@ type RelatedGameDto = {
   kind: 'edition' | 'extension';
 };
 
-const GAME_STATUSES = ['wishlist', 'playing', 'completed', 'abandoned'] as const;
+const GAME_STATUSES = ['wishlist', 'owned', 'playing', 'completed', 'abandoned'] as const;
 type GameStatus = (typeof GAME_STATUSES)[number];
+// « Voulu » au singulier ici : le chip désigne CE jeu (décision produit d'Étienne).
+// L'onglet Jeux garde « VOULUS » au pluriel (collection).
 const STATUS_LABELS: Record<GameStatus, string> = {
-  wishlist: 'Voulus',
+  wishlist: 'Voulu',
+  owned: 'Possédé',
   playing: 'En cours',
   completed: 'Terminé',
   abandoned: 'Abandonné',
@@ -79,6 +84,7 @@ export default function GameDetail() {
   const [persoMenu, setPersoMenu] = useState(false);
   const [artwork, setArtwork] = useState<'poster' | 'banner' | null>(null);
   const [listsOpen, setListsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -137,6 +143,25 @@ export default function GameDetail() {
     if (!detail.data) return;
     const url = typeof window !== 'undefined' ? window.location.href : undefined;
     shareMedia(detail.data.title, url);
+  };
+
+  // Signalement : envoie l'œuvre à l'équipe de modération (tri manuel).
+  // Échec silencieux — toast neutre dans tous les cas.
+  const submitReport = async () => {
+    setReportOpen(false);
+    if (!detail.data) return;
+    try {
+      await api.post('/api/report', {
+        mediaType: 'game',
+        mediaId: detail.data.id,
+        igdbId: detail.data.igdbId ?? undefined,
+        title: detail.data.title,
+        reason: 'adult',
+      });
+    } catch {
+      // Erreur silencieuse : on remercie quand même (pas de fuite d'état serveur).
+    }
+    showToast('Merci, signalement envoyé 👍');
   };
 
   if (detail.isLoading) return <FicheSkeleton heroHeight={200} />;
@@ -271,9 +296,12 @@ export default function GameDetail() {
               onPress={() => { setMenu(false); removeTracking.mutate(); }}
             />
           ) : null}
-          <SheetItem icon="share-2" label="Partager" onPress={() => { setMenu(false); share(); }} last />
+          <SheetItem icon="share-2" label="Partager" onPress={() => { setMenu(false); share(); }} />
+          <SheetItem icon="flag" label="Signaler" onPress={() => { setMenu(false); setReportOpen(true); }} last />
         </View>
       </Modal>
+
+      <ReportModal visible={reportOpen} onClose={() => setReportOpen(false)} onConfirm={submitReport} />
 
       <PersonalizeMenu
         visible={persoMenu}

@@ -66,6 +66,9 @@ model User {
   // Réglages applicatifs PAR UTILISATEUR (notifs, thème, abonnements…).
   setting            UserSetting?
 
+  // Signalements d'œuvres inappropriées émis par cet utilisateur.
+  reports            Report[]
+
   // Un compte SSO est identifié de façon unique par (provider, providerId).
   // Les comptes "password" ont providerId = null (SQLite autorise plusieurs NULL).
   @@unique([provider, providerId])
@@ -673,4 +676,24 @@ model CommentReaction {
   // Un utilisateur peut poser plusieurs emojis différents sur un même commentaire.
   @@unique([commentId, userId, emoji])
   @@index([commentId])
+}
+
+// Signalement d'une œuvre inappropriée (ex. hentai passé à travers le filtre).
+// Stocké pour un tri manuel ultérieur (pas d'écran admin pour l'instant).
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  mediaId    String?  // si l'œuvre existe en local
+  mediaType  String   // 'show' | 'movie' | 'game'
+  tmdbId     String?
+  igdbId     String?
+  title      String
+  reason     String   // ex. 'adult' (contenu 18+/porno) — extensible
+  note       String?
+  status     String   @default("pending") // pending | resolved | dismissed
+  createdAt  DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([reporterId])
 }

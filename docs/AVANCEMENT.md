@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Recherche : filtrage porno colmaté (marqueurs CJK/kanji dans `containsAdultContent` + vérif mots-clés TMDb étendue à TOUS les résultats, plus seulement les animés)
+Dernière mise à jour : **2026-07-16** (Claude) — Jeux : statut « Possédé » (collectionneurs) ; libellé chip « Voulu » au singulier sur la fiche ; système de signalement d'œuvre inappropriée (série/film/jeu) → modèle `Report` + `POST /api/report` + action « Signaler » dans le menu ⋯
 
 ---
 
@@ -47,8 +47,8 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Distribution native (APK / stores) | ⏳ Optionnel | EAS Build documenté dans le README ; la web app couvre déjà l'usage quotidien |
 | Jeux vidéo — modèle de données | ✅ Fait | Table `Game` (plateformes, développeur, éditeur, modes, Steam App ID, DLC) + `Media.igdbId` + `UserMediaStatus.playtimeMinutes` (migration `add_games`) |
 | Jeux vidéo — provider IGDB | ✅ Fait | `apps/server/src/services/igdb/` : auth Twitch (client credentials, cache mémoire), requêtes Apicalypse avec cache `ApiCache`, mapper `igdbToMedia` |
-| Jeux vidéo — module API | ✅ Fait | `apps/server/src/modules/games/routes.ts` : `GET /api/games/search`, `POST /api/games/add-from-igdb`, `GET /api/games` (bibliothèque groupée par statut wishlist/playing/completed/abandoned), `POST /api/games/:id/status`, `GET /api/games/:id` (enrichissement paresseux), `GET /api/games/discover`, `GET /api/games/upcoming`, `POST /api/games/steam/import`, `DELETE /api/games/:id/tracking` |
-| Jeux vidéo — onglet Jeux (mobile) | ✅ Fait | `mobile/app/(tabs)/games.tsx` : bibliothèque par statut, carrousels « Populaires »/« À venir » (découverte, tap = ajoute + ouvre la fiche), « Sorties à venir » (jeux suivis, groupés par mois) ; recherche déplacée dans l'onglet Explorer |
+| Jeux vidéo — module API | ✅ Fait | `apps/server/src/modules/games/routes.ts` : `GET /api/games/search`, `POST /api/games/add-from-igdb`, `GET /api/games` (bibliothèque groupée par statut wishlist/**owned**/playing/completed/abandoned — « owned » = Possédé, sans `completedAt` ni XP de fin), `POST /api/games/:id/status`, `GET /api/games/:id` (enrichissement paresseux), `GET /api/games/discover`, `GET /api/games/upcoming`, `POST /api/games/steam/import`, `DELETE /api/games/:id/tracking` |
+| Jeux vidéo — onglet Jeux (mobile) | ✅ Fait | `mobile/app/(tabs)/games.tsx` : bibliothèque par statut (VOULUS / **POSSÉDÉS** / EN COURS / TERMINÉS / ABANDONNÉS), carrousels « Populaires »/« À venir » (découverte, tap = ajoute + ouvre la fiche), « Sorties à venir » (jeux suivis, groupés par mois) ; recherche déplacée dans l'onglet Explorer |
 | Jeux vidéo — connexion Steam (mobile) | ✅ Fait | Bloc « Jeux — Steam » dans `mobile/app/settings.tsx` (onglet Compte) : SteamID/URL de profil → import bibliothèque possédée |
 | Jeux vidéo — fiche jeu (mobile) | ✅ Fait | `mobile/app/game/[id].tsx` : parité avec la fiche série/film — menu « … » (Personnaliser affiche/bannière via `GET/POST /api/games/:id/images|poster|banner`, Favoris `POST /api/games/:id/favorite`, Ajouter à une liste, Partager, Retirer), aperçu bande-annonce 16:9 (miniature YouTube + iframe autoplay sur web / ouverture YouTube sur natif, `videoId` IGDB), sélecteur de statut, temps de jeu, commentaires ; suivi optimiste avec rollback |
 | Jeux vidéo — notifications de sortie | ✅ Fait | Passe du worker de fond (`apps/server/src/services/sync-worker.ts`) : `Notification` de type `game_release` quand `Media.releaseDate` d'un jeu suivi (non masqué) tombe aujourd'hui, dédupliquée par `(userId, mediaId, type)` |
@@ -58,6 +58,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Modération — commentaires (haine/insultes graves) | ✅ Fait | Module pur `packages/core/src/moderation/` (blocklist curée multilingue fr/en/es/de/it/pt × racisme/antisémitisme/homophobie/sexisme/injures sexuelles/violence + filtre tolérant leetspeak/répétitions/séparateurs/accents, frontière de mot pour termes courts) ; `POST /api/media/:id/comments` rejette (400 `comment_blocked`) commentaires **et** réponses ; mobile affiche le message renvoyé (testé, 0 faux positif sur la batterie légitime) |
 | Modération — suggestions (contenu adulte / porno) | ✅ Fait | Détection **porno ciblée** (sans bloquer la violence 18+) : module pur `packages/core/src/moderation/adultContent.ts` (`containsAdultContent` + `ADULT_MARKERS` multilingues fr/en/es/de/it/pt + japonais romanisé, tolérant leet/répétitions/séparateurs). TMDb : `include_adult=false` + `adult === true` + `containsAdultContent(titre/résumé)` sur flux/recherche/recos, **et** `without_keywords` (ids mots-clés porno via `/search/keyword`, désormais **nom exact** — plus de sur-blocage sentai/senpai/porco) sur `/discover`ᐧ **Hentai** détecté par item via `tmdbKeywordNames` (mot-clé `erotic`, animés uniquement) + mot-clé `erotic` ajouté au `without_keywords` des viviers animés. IGDB : thème « Erotic » (id 42) + `containsAdultContent(name, summary)` dans `isSafeGame` (testé) |
 | Contenu 18+ — interrupteur par utilisateur | ✅ Fait | Paramètres > Suggestions > « Contenu 18+ » (défaut **désactivé**) : `allowAdultContent` (`UserSetting`, helper caché `modules/settings/adultContent.ts`). Activé = débraye tout le filtrage adulte pour ce compte (`include_adult=true`, pas de `without_keywords`, pas de `containsAdultContent`, pas de thème IGDB 42, pas de vérif mots-clés) sur `/api/explore/feed`, `/explore/discover`, `/api/search`, `/api/explore/games` ; `include_adult`/clause IGDB font partie de la **clé de cache** → aucune contamination entre comptes (testé). Bibliothèque jamais filtrée |
+| Signalement d'œuvre inappropriée | ✅ Fait | Modèle `Report` (migration `reports`) + module `apps/server/src/modules/reports/routes.ts` (`POST /api/report`, anti-doublon par œuvre/statut pending). Action « Signaler » (icône `flag`) dans le menu ⋯ des fiches série/film (`show/[id].tsx`) et jeu (`game/[id].tsx`) → `ReportModal` de confirmation partagé, `reason: 'adult'`, toast neutre. Tri manuel ultérieur (pas d'écran admin) |
 | Langue de contenu par utilisateur | ✅ Fait | Paramètres > Langue (fr/en/es/de/it/pt) : titres/résumés des séries et films traduits partout (À voir, À venir, bibliothèque, profil, fiches, recherche, explorer, fil social, listes) via TMDb `/translations` (`Media.translationsJson`, une requête par média, backfill en fond au changement de langue) ; jeux IGDB hors périmètre (nom international) |
 
 ## Prochaines étapes (par priorité)
@@ -77,6 +78,28 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Statut jeu « Possédé », libellé « Voulu », signalement d'œuvre
+Trois évolutions demandées par Étienne.
+- **Statut « Possédé » (collectionneurs)** : nouveau statut de jeu `owned`
+  (« Possédé ») ajouté à `GAME_STATUSES` côté serveur (`modules/games/routes.ts`)
+  et mobile (`app/game/[id].tsx`, `app/(tabs)/games.tsx` — section POSSÉDÉS entre
+  VOULUS et EN COURS). C'est une string libre : pas de migration. `completedAt`
+  reste posé UNIQUEMENT pour `completed`, et la gamification (`gamesCompleted`) ne
+  compte que `completed` → un jeu possédé non terminé ne donne aucun XP de fin.
+- **Libellé « Voulu » (singulier)** sur la fiche jeu : `STATUS_LABELS.wishlist`
+  passe de « Voulus » à « Voulu » (le chip désigne CE jeu). Le titre de section
+  « VOULUS » de l'onglet Jeux reste au pluriel (collection).
+- **Signalement d'œuvre** : modèle Prisma `Report`
+  (`reporterId`/`mediaId?`/`mediaType`/`tmdbId?`/`igdbId?`/`title`/`reason`/`note?`/`status`,
+  migration `reports`, indices `[status, createdAt]` et `[reporterId]`) +
+  module `modules/reports/routes.ts` (`POST /api/report`, zod, `reason` défaut
+  `'adult'`, anti-doublon : même user + même œuvre + status pending ⇒ pas de
+  2e ligne, 200 quand même). Action « Signaler » (icône `flag`) ajoutée au menu ⋯
+  des fiches série/film et jeu, ouvrant un `ReportModal` de confirmation partagé
+  (`components/ReportModal.tsx`) ; sur confirmation, `POST /api/report` puis toast
+  « Merci, signalement envoyé 👍 » (erreur silencieuse). Stockage seul, tri
+  manuel ultérieur (pas d'écran admin). Tests : `apps/server/src/__tests__/reports.test.ts`.
 
 ### 2026-07-16 — Profil public enrichi : niveau, trophées, streak et favoris
 Le profil public d'un utilisateur (`/user/[id]`) ne montrait que 3 compteurs et

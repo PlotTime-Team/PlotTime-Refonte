@@ -10,7 +10,9 @@ import { filterSeenWithFallback, loadRecentImpressions, recordImpressions } from
 import { genreProfile, igdbGenreWeights, pickWeighted } from '../explore/taste.js';
 import { allowsAdultContent } from '../settings/adultContent.js';
 
-const GAME_STATUSES = ['wishlist', 'playing', 'completed', 'abandoned'] as const;
+// `owned` = « Possédé » (jeux que le joueur possède, pour les collectionneurs) :
+// distinct de `completed` (aucun XP de fin, aucun `completedAt` posé).
+const GAME_STATUSES = ['wishlist', 'owned', 'playing', 'completed', 'abandoned'] as const;
 
 // Crée/à-jour le Media (type game) + Game à partir d'un id IGDB. Miroir de ensureMediaFromTmdb.
 export async function ensureGameFromIgdb(igdbId: string) {
@@ -110,7 +112,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       include: { media: { include: { game: true } } },
       orderBy: { updatedAt: 'desc' },
     });
-    const groups: Record<string, ReturnType<typeof serializeGame>[]> = { wishlist: [], playing: [], completed: [], abandoned: [] };
+    const groups: Record<string, ReturnType<typeof serializeGame>[]> = { wishlist: [], owned: [], playing: [], completed: [], abandoned: [] };
     for (const r of rows) {
       const bucket = groups[r.status];
       if (bucket) bucket.push(serializeGame(r.media, r));
