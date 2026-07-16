@@ -169,8 +169,10 @@ export function TopTabs({
 // badges 15dp / police 10, onglets hauts 42dp / police 14 / soulignement 3.
 export const styles = StyleSheet.create({
   pillHdr: { alignItems: 'center', paddingVertical: 10 },
+  // Pastilles de section : rose du logo en thème Nuit, gris TV Time sinon
+  // (rôles pillBg/pillFg — le thème décide).
   pillText: {
-    backgroundColor: COLORS.pillGrey, color: COLORS.white, borderRadius: 999,
+    backgroundColor: COLORS.pillBg, color: COLORS.pillFg, borderRadius: 999,
     paddingHorizontal: 14, paddingVertical: 4, fontSize: 11, fontFamily: FONTS.bold,
     letterSpacing: 0.8, textTransform: 'uppercase', overflow: 'hidden',
   },

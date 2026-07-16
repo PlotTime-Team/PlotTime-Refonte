@@ -6,9 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-17** (Claude) — Jeux : « Possédé » devient un interrupteur « Je possède » (booléen `isOwned`) indépendant du statut (retour Étienne) ; fiche jeu réorganisée (infos à côté de la jaquette, statuts remontés avant le trailer, section Informations fusionnée dans la fiche d'identité)
-
-Mise à jour précédente : **2026-07-16** (Claude) — Popup de migration douce vers le SSO : invite les comptes e-mail connectés (web) qui n'ont lié ni Google ni Discord, non bloquante (« Plus tard »)
+Dernière mise à jour : **2026-07-17** (Claude) — Jeux : « Je possède » en interrupteur + fiche réorganisée + rose du logo en accent secondaire (thème Nuit) d'Étienne
 
 ---
 
@@ -464,6 +462,21 @@ l'utilisateur (mêmes réponses API, même UX).
 - Tests : `apps/server/src/__tests__/password-reset.test.ts` (8 tests : flux
   complet avec login au nouveau mot de passe, jeton expiré/déjà utilisé/inconnu,
   identité SSO non liée refusée, autres champs intacts) — 99 tests serveur verts.
+### 2026-07-16 — Claude (10)
+- **Rose du logo en accent secondaire du THÈME NUIT — uniquement** (demande
+  produit : casser le monochrome du sombre avec le rose + le jaune du logo ;
+  les thèmes Clair et Sunset ne devaient PAS bouger — corrigé après une
+  première passe trop large). Rôles par thème `pillBg`/`pillFg`/`notif`/
+  `plusCount` : Nuit = rose `#FF4D97`, Clair/Sunset = valeurs TV Time
+  d'origine (pastilles grises/taupe, points rouges, compteurs gris).
+- En Nuit : **pastilles de section roses** (onglet Séries, bibliothèques,
+  Jeux, pastille flottante), **points de notification roses** (Explorer,
+  cloche du profil), **compteurs « +N » roses** sur les cartes À voir. Le
+  jaune de marque reste le premier accent (FILTRES, FAB, onglet actif,
+  barres En cours).
+- Vérifié au banc dans les trois thèmes (captures + relevé au pixel) :
+  Clair/Sunset strictement identiques à avant, rose en Nuit seulement.
+
 ### 2026-07-16 — Claude (9)
 - **Fiches série ET film : sections à l'échelle harmonisée** (les cotes lues
   sur les captures TV Time brutes rendaient « énormes » — retour récurrent) :

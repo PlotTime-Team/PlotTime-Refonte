@@ -48,6 +48,13 @@ const LIGHT = {
   provider: '#00A8E1',
   // Texte/icônes posés sur l'accent (boutons jaunes/terracotta, FAB, badges).
   onAccent: '#000000',
+  // Pastilles de section / points de notification / compteur « +N » : rôles
+  // séparés car le ROSE du logo ne s'applique QU'AU THÈME NUIT (demande
+  // produit 16/07) — les autres thèmes gardent les couleurs TV Time.
+  pillBg: '#858585',
+  pillFg: '#FFFFFF',
+  notif: '#C7222A',
+  plusCount: '#808080',
   // Vignettes/affiches en attente d'image.
   imagePlaceholder: '#E5E5E5',
 };
@@ -79,6 +86,13 @@ const DARK: Palette = {
   overlay: 'rgba(0,0,0,0.72)',
   provider: '#00A8E1',
   onAccent: '#101014',
+  // THÈME NUIT UNIQUEMENT : rose du logo (éclairci pour rester vif sur le
+  // charbon) sur les pastilles, notifications et compteurs — casse le
+  // monochrome (demande produit 16/07).
+  pillBg: '#FF4D97',
+  pillFg: '#FFFFFF',
+  notif: '#FF4D97',
+  plusCount: '#FF4D97',
   imagePlaceholder: '#2A2A32',
 };
 
@@ -107,6 +121,10 @@ const SUNSET: Palette = {
   overlay: 'rgba(61,41,25,0.55)',
   provider: '#C96F45',
   onAccent: '#FFF9F2',
+  pillBg: '#A5907D',
+  pillFg: '#FDFAF4',
+  notif: '#B8433C',
+  plusCount: '#8D7B6C',
   imagePlaceholder: '#E7DBCB',
 };
 
@@ -138,6 +156,12 @@ const MIDNIGHT: Palette = {
   provider: '#7A2BFF', // violet du logo (bouton « où regarder »)
   onAccent: '#0B075A', // bleu nuit sur les boutons jaunes, comme l'icône
   imagePlaceholder: '#221B8A',
+  // Rose du logo en accent secondaire (thème Nuit) : pastilles, notifications,
+  // compteurs — cf. commits 2026-07-17 d'Étienne (fusion des 4 palettes).
+  pillBg: '#FF4D9E',
+  pillFg: '#FFFFFF',
+  notif: '#FF4D9E',
+  plusCount: '#FF4D9E',
 };
 
 // NB : si un `bg` change ici, reporter la valeur dans le script pré-peinture
