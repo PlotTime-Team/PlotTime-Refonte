@@ -323,6 +323,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // Fallback e-mail / mot de passe — inscription (multi-comptes).
   // Rate limit serré : empêche le spam de création de comptes.
   app.post('/api/auth/register', { config: { rateLimit: { max: 10, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    // Inscription e-mail désactivée en prod : les nouveaux comptes passent par
+    // Google/Discord (aucun mot de passe à perdre). Le login e-mail existant
+    // (POST /api/auth/login) et l'OAuth restent ouverts.
+    if (!env.ALLOW_EMAIL_SIGNUP) {
+      return reply.code(403).send({
+        error: 'email_signup_disabled',
+        message: 'La création de compte se fait avec Google ou Discord.',
+      });
+    }
     const body = z
       .object({
         displayName: z.string().min(1).max(80),

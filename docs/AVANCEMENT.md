@@ -6,7 +6,9 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Jeux : statut « Possédé » (collectionneurs) ; libellé chip « Voulu » au singulier sur la fiche ; système de signalement d'œuvre inappropriée (série/film/jeu) → modèle `Report` + `POST /api/report` + action « Signaler » dans le menu ⋯
+Dernière mise à jour : **2026-07-16** (Claude) — Popup de migration douce vers le SSO : invite les comptes e-mail connectés (web) qui n'ont lié ni Google ni Discord, non bloquante (« Plus tard »)
+
+Mise à jour précédente : **2026-07-16** (Claude) — Jeux : statut « Possédé » (collectionneurs) ; libellé chip « Voulu » au singulier sur la fiche ; système de signalement d'œuvre inappropriée (série/film/jeu) → modèle `Report` + `POST /api/report` + action « Signaler » dans le menu ⋯
 
 ---
 
@@ -28,6 +30,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 |---|---|---|
 | Authentification multi-comptes (e-mail + mot de passe) | ✅ Fait | Inscription/connexion, sessions 30 j, données isolées par compte (testé) ; mot de passe oublié → réinitialisation par ré-auth SSO Google/Discord (testé) |
 | SSO Google / Facebook | ⏸ Préparé, désactivé | Prêt côté serveur (`/api/auth/oauth`) ; nécessite ids OAuth + dev build Expo |
+| Migration douce e-mail → SSO (popup) | ✅ Fait | `mobile/components/LinkAccountPrompt.tsx` : popup dismissible (web uniquement, SSO web-only) proposant de lier Google/Discord aux comptes connectés qui n'ont ni l'un ni l'autre ; montée dans `(tabs)/_layout.tsx` |
 | Contenu séries via TheTVDB | ✅ Fait | Recherche, fiche, saisons/épisodes, titres/synopsis FR, artworks ; clé dans `apps/server/.env` |
 | Contenu films / tendances via TMDb | ✅ Fait | Clé TMDb (compte Benjamin) configurée sur le serveur de prod ; flux Explorer et images films actifs |
 | File « À voir » / « À venir » | ✅ Fait | Groupes TV Time (pas commencé, à voir, etc.) ; « Regarder plus tard » exclu des deux |
@@ -78,6 +81,28 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Popup de migration douce vers le SSO
+Objectif : inciter en douceur les comptes e-mail existants à se lier à un
+fournisseur SSO (Google/Discord) pour pouvoir récupérer leur compte, sans
+bloquer personne.
+- **`mobile/components/LinkAccountPrompt.tsx`** (nouveau) : modal centré style
+  TV Time (overlay `COLORS.overlay`, carte `COLORS.white` arrondie), titre
+  « Sécurise ton compte », texte explicatif, bouton principal jaune « Lier mon
+  compte » (→ `router.push('/linked-accounts')`) et bouton discret « Plus
+  tard ». `useQuery(['auth','me'])` sur `GET /api/auth/me` (staleTime 5 min).
+  Condition d'affichage exacte : `ssoWebAvailable()` **et** la requête a
+  répondu **et** `!linkedProviders?.google && !linkedProviders?.discord`
+  **et** pas encore rejetée cette session (état local, non persisté — la
+  popup revient au prochain lancement). Les deux boutons ont
+  `accessibilityRole="button"` + `accessibilityLabel`.
+- **Montage** : `<LinkAccountPrompt />` dans `mobile/app/(tabs)/_layout.tsx`
+  (à côté des `<Tabs>`, dans un fragment) — jamais dans le root `_layout.tsx`,
+  qui affiche aussi l'écran de connexion. Les tabs ne rendent qu'une fois
+  connecté, ce qui garantit un utilisateur authentifié.
+- SSO étant web-only (`ssoWebAvailable()`), la popup ne s'affiche jamais côté
+  natif (la requête est même désactivée sur natif via `enabled`).
+- `cd mobile && npm run typecheck` → 0 erreur.
 
 ### 2026-07-16 — Statut jeu « Possédé », libellé « Voulu », signalement d'œuvre
 Trois évolutions demandées par Étienne.
