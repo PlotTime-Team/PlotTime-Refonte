@@ -7,6 +7,8 @@ import { getUserLang } from '../media/userLang.js';
 import { parseTranslations, tmdbEnabled, tmdbSearch, tmdbSearchPerson, tmdbTrending } from '../../services/tmdb/index.js';
 import { tvdbEnabled, tvdbLanguage, tvdbSearch } from '../../services/tvdb/index.js';
 import { attachSocialStats } from './socialStats.js';
+import { filterSeenWithFallback, loadRecentImpressions, recordImpressions } from '../explore/impressions.js';
+import { genreProfile, pickExplorationSlug, pickWeighted, tmdbGenreBySlug, tmdbGenreWeights } from '../explore/taste.js';
 
 type SearchResult = {
   id: string | null;
@@ -184,7 +186,9 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     // puis « à voir »/en cours/déjà vu (les swipes du mode Découvrir alimentent ça :
     // ♥ à voir = watchlist, ↓ déjà vu = completed). Plus il y en a, plus le flux
     // devient personnel.
-    const tasteSeeds = await prisma.userMediaStatus.findMany({
+    // Jusqu'à 30 candidats, puis 8 tirés AU HASARD à chaque appel : les
+    // recommandations changent à chaque refresh (avant : toujours les 8 mêmes).
+    const seedCandidates = await prisma.userMediaStatus.findMany({
       where: {
         userId: request.userId,
         isHidden: false,
@@ -192,8 +196,9 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       },
       include: { media: true },
       orderBy: [{ isFavorite: 'desc' }, { lastWatchedAt: 'desc' }],
-      take: 8,
+      take: 30,
     });
+    const tasteSeeds = [...seedCandidates].sort(() => Math.random() - 0.5).slice(0, 8);
     const mediaKeyFields = { tmdbId: true, type: true, title: true, originalTitle: true, year: true } as const;
     const disliked = await prisma.userMediaStatus.findMany({
       where: { userId: request.userId, isHidden: true },
@@ -203,6 +208,26 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       where: { userId: request.userId },
       select: { media: { select: mediaKeyFields } },
     });
+    // Mémoire du flux : les items servis il y a moins de 3 jours sont exclus du
+    // tirage (avec garde anti-famine plus bas) — cf. modules/explore/impressions.ts.
+    const seenRecently = await loadRecentImpressions(request.userId);
+    // Profil de goût par GENRES (favoris ×3, watchlist/en cours ×2, terminés ×1,
+    // dislikés ×−2) : 2 genres au hasard PONDÉRÉ (exploitation) + 1 genre hors
+    // profil (exploration) → viviers discover dédiés, différents à chaque refresh.
+    const tasteRows = await prisma.userMediaStatus.findMany({
+      where: { userId: request.userId, media: { type: { in: ['show', 'movie'] } } },
+      select: { status: true, isFavorite: true, isHidden: true, media: { select: { genres: true } } },
+    });
+    const genreWeights = tmdbGenreWeights(
+      genreProfile(
+        tasteRows.map((r) => ({ status: r.status, isFavorite: r.isFavorite, isHidden: r.isHidden, genres: r.media.genres })),
+      ),
+    );
+    const exploitSlugs = pickWeighted(genreWeights, 2);
+    const explorationSlug = pickExplorationSlug(genreWeights, exploitSlugs);
+    const genrePicks = [...exploitSlugs, ...(explorationSlug ? [explorationSlug] : [])]
+      .map((slug) => tmdbGenreBySlug(slug))
+      .filter((g): g is NonNullable<ReturnType<typeof tmdbGenreBySlug>> => Boolean(g));
     // Les médias ajoutés via TheTVDB n'ont pas toujours de tmdbId : on compare
     // alors type + titre normalisé (+ année quand elle est connue des deux côtés),
     // sinon une série déjà suivie réapparaît dans les recommandations.
@@ -257,43 +282,39 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
           });
         }
       }
-      // Page tirée au hasard : le pull-to-refresh / bouton ↻ renouvelle le flux.
+      // Pages tirées au hasard : 1..3 pour les tendances (classement court),
+      // 1..8 pour les viviers discover/classiques/anime — le pull-to-refresh
+      // change réellement le vivier, plus seulement l'ordre.
       const page = 1 + Math.floor(Math.random() * 3);
-      // Décennie tirée au hasard : le flux n'est pas QUE des sorties récentes,
-      // il propose aussi des titres plus anciens (toutes époques).
-      const decadeStart = 1980 + Math.floor(Math.random() * 5) * 10; // 1980..2020
-      const yGte = decadeStart;
-      const yLte = decadeStart + 9;
-      // Viviers : tendances (récent) + découverte populaire + CLASSIQUES toutes
-      // époques (tri par votes) + une DÉCENNIE aléatoire + un vivier ANIMÉ dédié.
+      const discPage = () => 1 + Math.floor(Math.random() * 8);
+      // DEUX décennies aléatoires distinctes : le flux mélange les époques.
+      const decades = [1980, 1990, 2000, 2010, 2020].sort(() => Math.random() - 0.5).slice(0, 2);
       const { tmdbDiscover } = await import('../../services/tmdb/index.js');
-      const [tv, movies, discTv, discMovies, classicTv, classicMovies, oldTv, oldMovies, animeTv, animeMovies, animeOld] =
-        await Promise.all([
-          tmdbTrending('tv', page, lang),
-          tmdbTrending('movie', page, lang),
-          tmdbDiscover('tv', { page, lang }),
-          tmdbDiscover('movie', { page, lang }),
-          tmdbDiscover('tv', { page, sort: 'vote_count.desc', lang }),
-          tmdbDiscover('movie', { page, sort: 'vote_count.desc', lang }),
-          tmdbDiscover('tv', { page, yearGte: yGte, yearLte: yLte, sort: 'vote_count.desc', lang }),
-          tmdbDiscover('movie', { page, yearGte: yGte, yearLte: yLte, sort: 'vote_count.desc', lang }),
-          tmdbDiscover('tv', { genres: [16], language: 'ja', page, lang }),
-          tmdbDiscover('movie', { genres: [16], language: 'ja', page, lang }),
-          tmdbDiscover('tv', { genres: [16], language: 'ja', page, sort: 'vote_count.desc', lang }),
-        ]);
-      const pool = [
-        ...tv,
-        ...movies,
-        ...discTv,
-        ...discMovies,
-        ...classicTv,
-        ...classicMovies,
-        ...oldTv,
-        ...oldMovies,
-        ...animeTv,
-        ...animeMovies,
-        ...animeOld,
-      ].sort(() => Math.random() - 0.5);
+      // Viviers : tendances (récent) + découverte populaire + CLASSIQUES toutes
+      // époques (tri par votes) + 2 DÉCENNIES aléatoires + un vivier ANIMÉ dédié
+      // + jusqu'à 3 viviers PAR GENRE issus du profil de goût (tv + movie).
+      const decadePools = decades.flatMap((d) => [
+        tmdbDiscover('tv', { page: discPage(), yearGte: d, yearLte: d + 9, sort: 'vote_count.desc', lang }),
+        tmdbDiscover('movie', { page: discPage(), yearGte: d, yearLte: d + 9, sort: 'vote_count.desc', lang }),
+      ]);
+      const genrePools = genrePicks.flatMap((g) => [
+        ...(g.tvId ? [tmdbDiscover('tv', { genres: [g.tvId], page: discPage(), lang })] : []),
+        ...(g.movieId ? [tmdbDiscover('movie', { genres: [g.movieId], page: discPage(), lang })] : []),
+      ]);
+      const pools = await Promise.all([
+        tmdbTrending('tv', page, lang),
+        tmdbTrending('movie', page, lang),
+        tmdbDiscover('tv', { page: discPage(), lang }),
+        tmdbDiscover('movie', { page: discPage(), lang }),
+        tmdbDiscover('tv', { page: discPage(), sort: 'vote_count.desc', lang }),
+        tmdbDiscover('movie', { page: discPage(), sort: 'vote_count.desc', lang }),
+        tmdbDiscover('tv', { genres: [16], language: 'ja', page: discPage(), lang }),
+        tmdbDiscover('movie', { genres: [16], language: 'ja', page: discPage(), lang }),
+        tmdbDiscover('tv', { genres: [16], language: 'ja', page: discPage(), sort: 'vote_count.desc', lang }),
+        ...decadePools,
+        ...genrePools,
+      ]);
+      const pool = pools.flat().sort(() => Math.random() - 0.5);
       for (const r of pool) {
         const trendType = r.title ? 'movie' : 'show';
         const trendTitle = r.name ?? r.title ?? '';
@@ -326,17 +347,25 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       keys.forEach((k) => seen.add(k));
       return true;
     });
+    // Anti-répétition : exclut les items servis il y a moins de 3 jours, avec
+    // garde anti-famine (les plus anciens repassent d'abord si le vivier
+    // restant est trop maigre) — jamais de flux vide à cause du filtre.
+    const FEED_TARGET = 66; // 3 catégories × PER_CAT
+    const itemKey = (c: SearchResult) => `${c.type}:tmdb:${c.tmdbId}`;
+    const varied = filterSeenWithFallback(deduped, itemKey, seenRecently, FEED_TARGET);
     // Plafond équilibré : au plus PER_CAT items par catégorie (serie/film/anime),
     // pour que chaque filtre de l'app reste fourni sans renvoyer une liste énorme.
     const PER_CAT = 22;
     const perCat = new Map<string, number>();
-    const feed = deduped.filter((c) => {
+    const feed = varied.filter((c) => {
       const cat = c.category ?? (c.type === 'show' ? 'serie' : 'film');
       const n = perCat.get(cat) ?? 0;
       if (n >= PER_CAT) return false;
       perCat.set(cat, n + 1);
       return true;
     });
+    // Mémorise ce qui vient d'être servi (exclu des tirages pendant 3 jours).
+    await recordImpressions(request.userId, feed.map(itemKey));
     const withStats = await attachSocialStats(feed, request.userId);
     return { feed: withStats };
   });

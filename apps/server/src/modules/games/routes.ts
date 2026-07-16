@@ -5,6 +5,8 @@ import { requireAuth } from '../auth/routes.js';
 import { igdbGame, igdbRelated, igdbSearch, igdbToMedia, igdbImageUrl, isMainGame } from '../../services/igdb/index.js';
 import { nextFavoriteOrder } from '../media/favorites.js';
 import { scheduleRecompute } from '../gamification/service.js';
+import { filterSeenWithFallback, loadRecentImpressions, recordImpressions } from '../explore/impressions.js';
+import { genreProfile, igdbGenreWeights, pickWeighted } from '../explore/taste.js';
 
 const GAME_STATUSES = ['wishlist', 'playing', 'completed', 'abandoned'] as const;
 
@@ -294,28 +296,45 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   // Flux « JEUX » de l'Explorer TikTok : cartes plein écran (mêmes champs que le
   // feed séries/films), alimentées par IGDB (populaires + à venir).
   app.get('/api/explore/games', async (request) => {
-    const { igdbPopular, igdbUpcoming, igdbRecent, igdbImageUrl } = await import('../../services/igdb/index.js');
-    const [popular, upcoming, recent, tracked] = await Promise.all([
-      igdbPopular(),
+    const { igdbPopular, igdbUpcoming, igdbRecent, igdbByGenres, igdbImageUrl } = await import('../../services/igdb/index.js');
+    // Jeux déjà suivis : exclus du flux (liker un jeu le fait sortir du tirage)
+    // ET matière du profil de goût par genres (mêmes pondérations que le feed
+    // séries/films : favoris ×3, wishlist/en cours ×2, terminés ×1, cachés ×−2).
+    const tracked = await prisma.userMediaStatus.findMany({
+      where: { userId: request.userId, media: { type: 'game' } },
+      select: { status: true, isFavorite: true, isHidden: true, media: { select: { igdbId: true, genres: true } } },
+    });
+    const weights = igdbGenreWeights(
+      genreProfile(
+        tracked.map((t) => ({ status: t.status, isFavorite: t.isFavorite, isHidden: t.isHidden, genres: t.media.genres })),
+      ),
+    );
+    // 1-2 genres préférés tirés au hasard pondéré → viviers IGDB dédiés.
+    const genreIds = pickWeighted(weights, 2).map(Number);
+    // Offsets aléatoires : fenêtre glissante dans les classements IGDB, le
+    // vivier change à chaque appel (la clé ApiCache = corps Apicalypse exact,
+    // offset et genres compris — le cache ne fige donc pas le hasard).
+    const randOffset = (max: number) => Math.floor(Math.random() * (max + 1));
+    const [popular, upcoming, recent, seenRecently, byGenre] = await Promise.all([
+      igdbPopular({ offset: randOffset(200) }),
       igdbUpcoming(),
-      igdbRecent(),
-      // Jeux déjà suivis par l'utilisateur : exclus du flux (comme le feed
-      // séries/films exclut la bibliothèque) — liker un jeu le fait sortir
-      // du tirage au prochain rafraîchissement.
-      prisma.userMediaStatus.findMany({
-        where: { userId: request.userId, media: { type: 'game' } },
-        select: { media: { select: { igdbId: true } } },
-      }),
+      igdbRecent({ offset: randOffset(100) }),
+      // Mémoire du flux : items servis < 3 jours exclus (garde anti-famine plus bas).
+      loadRecentImpressions(request.userId),
+      Promise.all(genreIds.map((gid) => igdbByGenres([gid], { offset: randOffset(150) }))),
     ]);
     const trackedIds = new Set(tracked.map((t) => t.media.igdbId).filter((x): x is string => Boolean(x)));
     const seen = new Set<number>();
-    const pool = [...popular, ...recent, ...upcoming]
+    const candidates = [...popular, ...recent, ...byGenre.flat(), ...upcoming]
       .filter((g) => !trackedIds.has(String(g.id)) && (seen.has(g.id) ? false : (seen.add(g.id), true)))
-      // Mélange PAR REQUÊTE (les requêtes IGDB sont cachées 24 h) : le
-      // pull-to-refresh / nouveau tirage propose un ordre et un échantillon
-      // différents à chaque fois, comme le feed séries/films.
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 60);
+      // Mélange PAR REQUÊTE : le pull-to-refresh / nouveau tirage propose un
+      // ordre et un échantillon différents à chaque fois.
+      .sort(() => Math.random() - 0.5);
+    // Anti-répétition (impressions < 3 jours) avec garde anti-famine : si le
+    // vivier restant est trop maigre, les items les plus anciens repassent.
+    const GAMES_TARGET = 60;
+    const itemKey = (g: { id: number }) => `game:igdb:${g.id}`;
+    const pool = filterSeenWithFallback(candidates, itemKey, seenRecently, GAMES_TARGET).slice(0, GAMES_TARGET);
     const feed = pool.map((g) => ({
       id: null,
       igdbId: String(g.id),
@@ -339,6 +358,8 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       stats: { likes: 0, watched: 0, comments: 0 },
       me: { liked: false, watched: false },
     }));
+    // Mémorise ce qui vient d'être servi (exclu des tirages pendant 3 jours).
+    await recordImpressions(request.userId, pool.map(itemKey));
     return { feed };
   });
 

@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Langue de contenu par utilisateur (fr/en/es/de/it/pt) : titres et résumés traduits partout via TMDb
+Dernière mise à jour : **2026-07-16** (Claude) — Flux Explorer réellement varié et personnalisé : mémoire des items servis (`ExploreImpression`, 3 j) + profil de goût par genres (TMDb/IGDB) + viviers élargis (pages 1..8, 2 décennies, offsets IGDB aléatoires)
 
 ---
 
@@ -54,6 +54,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Jeux vidéo — notifications de sortie | ✅ Fait | Passe du worker de fond (`apps/server/src/services/sync-worker.ts`) : `Notification` de type `game_release` quand `Media.releaseDate` d'un jeu suivi (non masqué) tombe aujourd'hui, dédupliquée par `(userId, mediaId, type)` |
 | Gamification — serveur (XP, badges, streaks, défis, classement) | ✅ Fait | Modèles `UserProgress`/`UserBadge`/`UserChallenge`, `modules/gamification/` (recompute idempotent débouncé + backfill au boot), `GET /api/gamification/me` + `/leaderboard`, items `badge` dans le fil social, XP rétroactif à l'import |
 | Gamification — mobile (page Trophées, toasts, pastille niveau) | ✅ Fait | Page `/trophies` (niveau + XP, streak, défis du mois, grille de badges à paliers, classement hebdo), pastille niveau + rangée Trophées sur le profil, items badge dans le fil, toasts de déblocage globaux (`GamificationToastHost`) |
+| Flux Explorer — variété + personnalisation (serveur) | ✅ Fait | `GET /api/explore/feed` + `GET /api/explore/games` : mémoire des impressions (`ExploreImpression`, exclusion 3 j, garde anti-famine, purge 14 j), profil de goût par genres (favoris ×3, watchlist/en cours ×2, terminés ×1, dislikés ×−2) → viviers TMDb Discover/IGDB par genre, recs tirées parmi 30 graines, pages 1..8, 2 décennies, offsets IGDB aléatoires (`modules/explore/`, testé) |
 | Langue de contenu par utilisateur | ✅ Fait | Paramètres > Langue (fr/en/es/de/it/pt) : titres/résumés des séries et films traduits partout (À voir, À venir, bibliothèque, profil, fiches, recherche, explorer, fil social, listes) via TMDb `/translations` (`Media.translationsJson`, une requête par média, backfill en fond au changement de langue) ; jeux IGDB hors périmètre (nom international) |
 
 ## Prochaines étapes (par priorité)
@@ -73,6 +74,41 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Flux Explorer varié et personnalisé (serveur)
+- Problème : `GET /api/explore/feed` et `GET /api/explore/games` proposaient
+  toujours les mêmes titres (aucune mémoire de ce qui avait été montré, pages
+  aléatoires étroites 1..3 sur des classements quasi statiques, vivier jeux figé).
+- **Prisma** : modèle `ExploreImpression` (`userId` + `itemKey` uniques,
+  `servedAt`, cascade User) — migration `explore_impressions`. Clés :
+  `show:tmdb:123` / `movie:tmdb:456` / `game:igdb:789`.
+- **`modules/explore/impressions.ts`** : les items servis il y a moins de
+  3 jours sont exclus du tirage suivant ; garde ANTI-FAMINE (si le vivier
+  restant < cible — 66 cartes feed / 60 jeux — les items vus les plus anciens
+  repassent d'abord, jamais de flux vide) ; enregistrement en
+  `deleteMany` + `createMany` transactionnels (pas de N+1) ; purge
+  fire-and-forget des lignes > 14 jours.
+- **`modules/explore/taste.ts`** : profil de goût par genres (favoris ×3,
+  watchlist/en cours/wishlist/playing ×2, terminés ×1, dislikés `isHidden`
+  ×−2) sur `Media.genres` (CSV de noms — fr TMDb ou anglais IGDB) ; mapping
+  statique nom→id des genres TMDb standards (tv + movie, variantes fr/en) et
+  IGDB ; tirage pondéré sans remise (`pickWeighted`) + genre d'EXPLORATION
+  hors profil.
+- **Feed séries/films** : à chaque refresh, 2 genres pondérés + 1 genre
+  d'exploration → viviers `tmdbDiscover` dédiés (tv + movie) ; recs tirées de
+  8 graines AU HASARD parmi 30 candidats (avant : toujours les 8 mêmes) ;
+  pages 1..8 pour discover/classiques/anime (1..3 conservé pour trending),
+  DEUX décennies aléatoires au lieu d'une. Plafond PER_CAT et dédup inchangés.
+- **Jeux** : `igdbPopular`/`igdbRecent` acceptent un `offset` Apicalypse
+  aléatoire (fenêtre glissante dans les classements) + `igdbByGenres(genreIds,
+  {offset})` (1-2 pools selon le profil de goût jeux). La clé `ApiCache` étant
+  le corps Apicalypse exact, offsets/genres différents = entrées de cache
+  différentes (le hasard n'est pas figé par le cache 24 h).
+- **Tests** (`explore-taste.test.ts` unitaire + `explore-impressions.test.ts`
+  intégration, fetch TMDb/Twitch/IGDB mocké) : pondérations du profil,
+  mappings de genres, tirage pondéré, exclusion d'un item servi au 1er appel,
+  format des clés en DB, garde anti-famine sur vivier minuscule entièrement
+  vu, exclusion des jeux suivis. 121 tests serveur verts.
 
 ### 2026-07-16 — Langue de contenu par utilisateur (titres/résumés traduits)
 - L'utilisateur choisit sa langue dans Paramètres > APPLICATION > « Langue »

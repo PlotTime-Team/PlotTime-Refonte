@@ -71,18 +71,36 @@ export async function igdbGame(id: number): Promise<IgdbGame | null> {
   return r && r.length ? r[0]! : null;
 }
 
-export async function igdbPopular(): Promise<IgdbGame[]> {
-  const body = `${FIELDS}; where total_rating_count > 200; sort total_rating desc; limit 50;`;
+// `offset N;` Apicalypse : fenêtre glissante dans le classement — le flux
+// Explorer tire un offset aléatoire pour varier le vivier à chaque appel.
+// NB cache : la clé ApiCache est le corps Apicalypse EXACT (endpoint + body,
+// cf. igdbQuery) — un offset/genre différent = une entrée de cache différente,
+// le hasard n'est donc jamais figé par le cache.
+const offsetClause = (offset?: number) => (offset ? ` offset ${offset};` : '');
+
+export async function igdbPopular(opts: { offset?: number } = {}): Promise<IgdbGame[]> {
+  const body = `${FIELDS}; where total_rating_count > 200; sort total_rating desc; limit 50;${offsetClause(opts.offset)}`;
   return ((await igdbQuery<IgdbGame[]>('games', body, DAY)) ?? []).filter(isMainGame);
 }
 
 // Sorties récentes bien notées (2 dernières années) : élargit le vivier du
 // flux Explorer au-delà du top all-time, pour que chaque tirage varie.
-export async function igdbRecent(): Promise<IgdbGame[]> {
+export async function igdbRecent(opts: { offset?: number } = {}): Promise<IgdbGame[]> {
   const now = Math.floor(Date.now() / 1000);
   const twoYearsAgo = now - 2 * 365 * 86_400;
-  const body = `${FIELDS}; where first_release_date > ${twoYearsAgo} & first_release_date < ${now} & total_rating_count > 20; sort total_rating desc; limit 50;`;
+  const body = `${FIELDS}; where first_release_date > ${twoYearsAgo} & first_release_date < ${now} & total_rating_count > 20; sort total_rating desc; limit 50;${offsetClause(opts.offset)}`;
   return ((await igdbQuery<IgdbGame[]>('games', body, DAY)) ?? []).filter(isMainGame);
+}
+
+// Vivier par genres IGDB (profil de goût du flux Explorer jeux). Corps exposé
+// pour les tests (pré-remplissage du cache ApiCache adressé par ce corps).
+export function genresQueryBody(genreIds: number[], opts: { offset?: number } = {}): string {
+  return `${FIELDS}; where genres = (${genreIds.join(',')}) & total_rating_count > 50; sort total_rating desc; limit 50;${offsetClause(opts.offset)}`;
+}
+
+export async function igdbByGenres(genreIds: number[], opts: { offset?: number } = {}): Promise<IgdbGame[]> {
+  if (genreIds.length === 0) return [];
+  return ((await igdbQuery<IgdbGame[]>('games', genresQueryBody(genreIds, opts), DAY)) ?? []).filter(isMainGame);
 }
 
 export async function igdbUpcoming(): Promise<IgdbGame[]> {

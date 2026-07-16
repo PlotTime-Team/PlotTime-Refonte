@@ -60,6 +60,9 @@ model User {
   // Réinitialisation du mot de passe via ré-authentification SSO.
   passwordResetTokens PasswordResetToken[]
 
+  // Mémoire du flux Explorer (items déjà servis, exclus du tirage 3 jours).
+  exploreImpressions ExploreImpression[]
+
   // Un compte SSO est identifié de façon unique par (provider, providerId).
   // Les comptes "password" ont providerId = null (SQLite autorise plusieurs NULL).
   @@unique([provider, providerId])
@@ -521,6 +524,21 @@ model Notification {
 
   @@index([userId])
   @@index([date])
+}
+
+// Mémoire du flux Explorer : items déjà servis à un utilisateur. Un item vu
+// il y a moins de 3 jours est exclu du tirage suivant (variété réelle entre
+// deux refresh) ; les lignes de plus de 14 jours sont purgées au fil de l'eau.
+model ExploreImpression {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "show:tmdb:123" | "movie:tmdb:456" | "game:igdb:789"
+  itemKey  String
+  servedAt DateTime @default(now())
+
+  @@unique([userId, itemKey])
+  @@index([userId, servedAt])
 }
 
 model AppSetting {
