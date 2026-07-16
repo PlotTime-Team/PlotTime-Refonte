@@ -172,7 +172,7 @@ export default function Setup() {
                 Inscris-toi en un clic avec Google ou Discord — pas de mot de passe à retenir,
                 et tu récupères ton compte à tout moment.
               </Text>
-              <SsoButtons onToken={oauth} />
+              <SsoButtons onToken={oauth} separator={null} />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <Pressable
                 onPress={() => {
