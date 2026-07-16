@@ -312,7 +312,8 @@ export async function socialRoutes(app: FastifyInstance): Promise<void> {
       request.log.info({ category: blocked.category }, 'comment blocked by moderation');
       return reply.code(400).send({
         error: 'comment_blocked',
-        message: 'Ce commentaire enfreint les règles de la communauté et ne peut pas être publié.',
+        message:
+          'Hop hop hop ! 🙅 La politesse est de mise sur SerieTime, chenapan. Reformule ça sans insulte et réessaie 😇',
       });
     }
     const media = await prisma.media.findUnique({ where: { id } });

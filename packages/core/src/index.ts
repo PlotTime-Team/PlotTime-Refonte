@@ -13,3 +13,4 @@ export * from './gamification/streak.js';
 export * from './gamification/challenges.js';
 export * from './moderation/blocklist.js';
 export * from './moderation/filter.js';
+export * from './moderation/adultContent.js';

@@ -9,6 +9,22 @@ import { tvdbEnabled, tvdbLanguage, tvdbSearch } from '../../services/tvdb/index
 import { attachSocialStats } from './socialStats.js';
 import { filterSeenWithFallback, loadRecentImpressions, recordImpressions } from '../explore/impressions.js';
 import { genreProfile, pickExplorationSlug, pickWeighted, tmdbGenreBySlug, tmdbGenreWeights } from '../explore/taste.js';
+import { containsAdultContent } from '@serietime/core';
+
+// Contenu pornographique exclu du flux et de la recherche : marqueur TMDb
+// `adult` OU signaux porno (titre/résumé) via containsAdultContent. La violence
+// (gore, meurtre…) N'EST PAS visée — seul le porno est écarté.
+type AdultCheckable = {
+  adult?: boolean;
+  name?: string;
+  title?: string;
+  original_name?: string;
+  original_title?: string;
+  overview?: string;
+};
+function isAdultContent(r: AdultCheckable): boolean {
+  return r.adult === true || containsAdultContent(r.name, r.title, r.original_name, r.original_title, r.overview);
+}
 
 type SearchResult = {
   id: string | null;
@@ -136,7 +152,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     if (tmdbEnabled()) {
       const remote = await tmdbSearch(q, 'multi', undefined, lang);
       for (const r of remote.slice(0, 20)) {
-        if (r.adult) continue; // exclut le contenu pour adultes (porno)
+        if (isAdultContent(r)) continue; // exclut le contenu pornographique
         add({
           id: null,
           tmdbId: String(r.id),
@@ -261,7 +277,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
         // favoris pèsent plus lourd (plus de suggestions issues d'eux).
         const picks = [...recs].sort(() => Math.random() - 0.5).slice(0, status.isFavorite ? 5 : 3);
         for (const r of picks) {
-          if (r.adult) continue; // exclut le contenu pour adultes (porno)
+          if (isAdultContent(r)) continue; // exclut le contenu pornographique
           const recType = status.media.type === 'show' ? 'show' : 'movie';
           const recTitle = r.name ?? r.title ?? '';
           const recYear = (r.first_air_date ?? r.release_date)
@@ -318,7 +334,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       ]);
       const pool = pools.flat().sort(() => Math.random() - 0.5);
       for (const r of pool) {
-        if (r.adult) continue; // exclut le contenu pour adultes (porno)
+        if (isAdultContent(r)) continue; // exclut le contenu pornographique
         const trendType = r.title ? 'movie' : 'show';
         const trendTitle = r.name ?? r.title ?? '';
         const trendYear = (r.first_air_date ?? r.release_date)
@@ -384,8 +400,8 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       backdropPath: r.backdrop_path ?? null,
     });
     return {
-      shows: tv.filter((r) => !r.adult).map((r) => map(r, 'show')),
-      movies: movies.filter((r) => !r.adult).map((r) => map(r, 'movie')),
+      shows: tv.filter((r) => !isAdultContent(r)).map((r) => map(r, 'show')),
+      movies: movies.filter((r) => !isAdultContent(r)).map((r) => map(r, 'movie')),
     };
   });
 

@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Modération en deux volets : filtrage des commentaires haineux/gravement injurieux (module pur multilingue) + exclusion du contenu pour adultes des suggestions (TMDb `adult`, IGDB thème « Erotic »)
+Dernière mise à jour : **2026-07-16** (Claude) — Détection pornographie renforcée (marqueurs porno multilingues sur titres/résumés séries/films/animés **et** jeux, mots-clés TMDb `without_keywords`, garde IGDB) sans bloquer la violence + popup drôle au commentaire bloqué
 
 ---
 
@@ -56,7 +56,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Gamification — mobile (page Trophées, toasts, pastille niveau) | ✅ Fait | Page `/trophies` (niveau + XP, streak, défis du mois, grille de badges à paliers, classement hebdo), pastille niveau + rangée Trophées sur le profil, items badge dans le fil, toasts de déblocage globaux (`GamificationToastHost`) |
 | Flux Explorer — variété + personnalisation (serveur) | ✅ Fait | `GET /api/explore/feed` + `GET /api/explore/games` : mémoire des impressions (`ExploreImpression`, exclusion 3 j, garde anti-famine, purge 14 j), profil de goût par genres (favoris ×3, watchlist/en cours ×2, terminés ×1, dislikés ×−2) → viviers TMDb Discover/IGDB par genre, recs tirées parmi 30 graines, pages 1..8, 2 décennies, offsets IGDB aléatoires (`modules/explore/`, testé) |
 | Modération — commentaires (haine/insultes graves) | ✅ Fait | Module pur `packages/core/src/moderation/` (blocklist curée multilingue fr/en/es/de/it/pt × racisme/antisémitisme/homophobie/sexisme/injures sexuelles/violence + filtre tolérant leetspeak/répétitions/séparateurs/accents, frontière de mot pour termes courts) ; `POST /api/media/:id/comments` rejette (400 `comment_blocked`) commentaires **et** réponses ; mobile affiche le message renvoyé (testé, 0 faux positif sur la batterie légitime) |
-| Modération — suggestions (contenu adulte / porno) | ✅ Fait | TMDb : `include_adult=false` par défaut sur toutes les requêtes + exclusion `adult === true` du flux Explorer et de la recherche ; IGDB : exclusion du thème « Erotic » (id 42) sur chaque clause `where` de découverte/recherche + garde `isSafeGame` (testé) |
+| Modération — suggestions (contenu adulte / porno) | ✅ Fait | Détection **porno ciblée** (sans bloquer la violence 18+) : module pur `packages/core/src/moderation/adultContent.ts` (`containsAdultContent` + `ADULT_MARKERS` multilingues fr/en/es/de/it/pt + japonais romanisé, tolérant leet/répétitions/séparateurs). TMDb : `include_adult=false` + `adult === true` + `containsAdultContent(titre/résumé)` sur flux/recherche/recos, **et** `without_keywords` (ids mots-clés porno récupérés dynamiquement via `/search/keyword`, doublement cachés) sur `/discover`. IGDB : thème « Erotic » (id 42) + `containsAdultContent(name, summary)` dans `isSafeGame` (testé) |
 | Langue de contenu par utilisateur | ✅ Fait | Paramètres > Langue (fr/en/es/de/it/pt) : titres/résumés des séries et films traduits partout (À voir, À venir, bibliothèque, profil, fiches, recherche, explorer, fil social, listes) via TMDb `/translations` (`Media.translationsJson`, une requête par média, backfill en fond au changement de langue) ; jeux IGDB hors périmètre (nom international) |
 
 ## Prochaines étapes (par priorité)
@@ -76,6 +76,53 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Détection pornographie renforcée + popup drôle au commentaire bloqué
+Durcissement anti-porno pour ne **rien** laisser passer de pornographique
+(hentai, porno, softcore, X, eroge) sur séries/films/animés **et** jeux, **sans**
+bloquer la violence (un contenu 18+ pour gore/meurtre/langage reste autorisé) :
+on cible les **signaux de pornographie**, pas le classement d'âge.
+- **Module pur** `packages/core/src/moderation/adultContent.ts` (exporté depuis
+  `@serietime/core`) : `containsAdultContent(text, ...more)` normalise (réutilise
+  `normalizeForModeration` : minuscules, accents, leetspeak, répétitions,
+  séparateurs) puis cherche des marqueurs **sans ambiguïté**. `ADULT_MARKERS`
+  (exportée, extensible, commentée) couvre fr/en/es/de/it/pt + japonais romanisé
+  (hentai/eroge/nukige/ahegao/bukkake/futanari/jav…). Deux modes : sous-chaîne
+  pour les racines non ambiguës (« porn » couvre porno/pornographic/pornographie/
+  pornografia/pornografico/pornostar…), frontière de mot pour les courts/ambigus
+  (`xxx`, `jav`, `milf` → évite « MaXXXine », « milfoil », « Java »). **Exclus**
+  volontairement : `erotic`/`erotique`, `ecchi`, `sexy`, `nude`, `sex` seuls
+  (« Sex Education », « Basic Instinct », « Nymphomaniac » restent grand public).
+- **TMDb** : `getAdultKeywordIds()` récupère dynamiquement les ids de mots-clés
+  porno via `GET /search/keyword?query=…` (termes : hentai, pornographic,
+  pornography, porno, erotic movie), doublement cachés (ApiCache 30 j + mémoire
+  process), passés en `without_keywords` sur **toutes** les requêtes
+  `tmdbDiscover`. Post-filtre `containsAdultContent(titre/résumé)` (en plus de
+  `adult === true`) partout où des résultats TMDb deviennent des cartes de flux
+  ou de recherche : `/api/search`, les 3 boucles du flux Explorer (recos + pools),
+  `/api/explore/discover`.
+- **IGDB** : `isSafeGame` exclut désormais aussi `containsAdultContent(name,
+  summary)` (visual novels/eroge explicites sans thème 42) — thème « Erotic »
+  (id 42) conservé, `summary`/`name` déjà dans les `FIELDS`.
+- **Popup drôle au commentaire bloqué.** Serveur (`social/routes.ts`) : message
+  `comment_blocked` remplacé par un texte léger et complice (« Hop hop hop ! 🙅 La
+  politesse est de mise sur SerieTime, chenapan… 😇 »). Mobile : nouveau composant
+  `mobile/components/comments/BlockedCommentPopup.tsx` (petit modal centré,
+  overlay semi-transparent, bouton « OK compris » avec `accessibilityLabel`, thème
+  COLORS/FONTS) remplace le message inline sous la saisie, branché sur `postError`
+  du hook partagé `useComments` → couvre les **deux** points d'envoi (composeur du
+  `CommentsSheet` TikTok **et** écran plein écran `app/comments/[id]`).
+- **Tests** : +44 core (blocage porno multilingue + contournements ; batterie
+  non-régression 0 faux positif : Sex Education, Basic Instinct, Nymphomaniac,
+  Game of Thrones/The Boys/horreur gore, ecchi, MaXXXine/milfoil/Java) et +2
+  serveur (item TMDb `adult:false` au titre « Hentai » exclu, jeu IGDB sans
+  thème 42 au nom/résumé porno exclu, **item violent conservé**). Core 143,
+  serveur 138, `typecheck` serveur + mobile OK.
+- **Limites connues** : collision « xXx » (film Vin Diesel 2002) — le token isolé
+  `xxx` est un signal porno trop fort pour être relâché, tradeoff assumé
+  (« MaXXXine » 2024 est, elle, épargnée par la frontière de mot). `tmdbTrending`
+  et `tmdbRecommendations` ne supportent pas `without_keywords` → couverts par le
+  seul post-filtre.
 
 ### 2026-07-16 — Modération en deux volets (commentaires haineux + contenu adulte)
 Deux garde-fous de communauté, sans changement visuel hors le message d'erreur.

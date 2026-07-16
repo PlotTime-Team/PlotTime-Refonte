@@ -8,6 +8,7 @@ import { EmptyState, Loading } from '@/components/ui';
 import { Pop, AppearItem } from '@/components/anim';
 import { useComments, SORT_LABEL } from '@/components/comments/useComments';
 import { CommentCard } from '@/components/comments/CommentCard';
+import { BlockedCommentPopup } from '@/components/comments/BlockedCommentPopup';
 
 // Page « Commentaires » (copie TV Time) : ouverte depuis la rangée
 // « Commentaires N › » au bas de la fiche. Cartes blanches sur fond gris,
@@ -122,13 +123,14 @@ export default function CommentsScreen() {
             multiline
             autoFocus
           />
-          {/* Message de modération : commentaire rejeté (règles communauté). */}
-          {postError ? <Text style={styles.blocked}>{postError}</Text> : null}
           <Pressable style={[styles.send, (!text.trim() || busy) && { opacity: 0.4 }]} onPress={submit} disabled={!text.trim() || busy}>
             {busy ? <ActivityIndicator color={COLORS.onAccent} /> : <Text style={styles.sendText}>PUBLIER</Text>}
           </Pressable>
         </View>
       </Modal>
+
+      {/* Popup de modération : commentaire/réponse rejeté (règles communauté). */}
+      <BlockedCommentPopup message={postError} onClose={clearPostError} />
     </Pop>
   );
 }
@@ -146,7 +148,6 @@ const styles = StyleSheet.create({
   sheet: { position: 'absolute', left: 8, right: 8, bottom: 8, backgroundColor: COLORS.white, borderRadius: 14, padding: 16 },
   sheetTitle: { color: COLORS.text, fontSize: 18, fontFamily: FONTS.extraBold, marginBottom: 10 },
   input: { color: COLORS.text, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, minHeight: 80, padding: 12, fontFamily: FONTS.regular, fontSize: 16, textAlignVertical: 'top' },
-  blocked: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.red, marginTop: 10 },
   send: { alignSelf: 'flex-end', marginTop: 12, backgroundColor: COLORS.yellow, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 10 },
   sendText: { color: COLORS.onAccent, fontFamily: FONTS.extraBold, fontSize: 13, letterSpacing: 0.4 },
 });

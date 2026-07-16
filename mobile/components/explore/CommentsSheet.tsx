@@ -7,6 +7,7 @@ import { COLORS, FONTS } from '@/lib/theme';
 import { EmptyState, Loading } from '@/components/ui';
 import { useComments } from '@/components/comments/useComments';
 import { CommentCard } from '@/components/comments/CommentCard';
+import { BlockedCommentPopup } from '@/components/comments/BlockedCommentPopup';
 import type { FeedItem } from './types';
 
 export function CommentsSheet({
@@ -140,8 +141,8 @@ function CommentsPanel({
           ))}
         </ScrollView>
       )}
-      {/* Message de modération : commentaire/réponse rejeté (règles communauté). */}
-      {postError ? <Text style={styles.blocked}>{postError}</Text> : null}
+      {/* Popup de modération : commentaire/réponse rejeté (règles communauté). */}
+      <BlockedCommentPopup message={postError} onClose={clearPostError} />
       {/* Barre de composition TikTok : en bas, inline (pas de FAB flottant ici). */}
       <View style={styles.composer}>
         <TextInput
@@ -190,7 +191,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: FONTS.extraBold, fontSize: 18, color: COLORS.black },
   center: { padding: 40, alignItems: 'center' },
   err: { fontFamily: FONTS.regular, fontSize: 15, color: COLORS.textMuted },
-  blocked: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.red, paddingHorizontal: 16, paddingTop: 8 },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',

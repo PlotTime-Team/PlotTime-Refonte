@@ -1,3 +1,4 @@
+import { containsAdultContent } from '@serietime/core';
 import { igdbQuery, igdbEnabled } from './client.js';
 export { igdbEnabled };
 
@@ -41,6 +42,10 @@ const SAFE_THEMES = '(themes != (42) | themes = null)';
 // dont un thème est « Erotic » (id 42 ou nom contenant « erotic »/« sexual »).
 // Appliquée APRÈS isMainGame dans les listes de découverte/recherche.
 export function isSafeGame(g: IgdbGame): boolean {
+  // Post-filtre porno : les visual novels / eroge explicites qui n'ont pas le
+  // thème 42 mais un nom/résumé sans ambiguïté sont écartés (name + summary
+  // font partie des FIELDS). La violence n'est PAS visée.
+  if (containsAdultContent(g.name, g.summary)) return false;
   if (!g.themes || g.themes.length === 0) return true;
   return !g.themes.some((t) => t.id === 42 || (t.name != null && /erotic|sexual/i.test(t.name)));
 }

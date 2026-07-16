@@ -291,6 +291,29 @@ export async function tmdbTranslations(
   return cachedFetch(`/${type}/${tmdbId}/translations`, {}, 7 * DAY);
 }
 
+// Mots-clés TMDb pornographiques : ids récupérés DYNAMIQUEMENT via
+// GET /search/keyword (le catalogue de mots-clés TMDb bouge), pour être passés
+// en `without_keywords` sur /discover (exclusion À LA SOURCE). Double cache :
+// ApiCache (via cachedFetch, 30 j) + mémoire process (évite de relire ApiCache
+// à chaque discover). Les termes sont volontairement NON ambigus (pas
+// « erotic » seul, qui bloquerait les « erotic thriller » grand public — sauf
+// « erotic movie » qui, comme mot-clé TMDb, désigne bien le porno).
+const ADULT_KEYWORD_TERMS = ['hentai', 'pornographic', 'pornography', 'porno', 'erotic movie'];
+let adultKeywordCache: { ids: string[]; expiresAt: number } | null = null;
+
+export async function getAdultKeywordIds(): Promise<string[]> {
+  if (!tmdbEnabled()) return [];
+  if (adultKeywordCache && adultKeywordCache.expiresAt > Date.now()) return adultKeywordCache.ids;
+  const ids = new Set<string>();
+  for (const term of ADULT_KEYWORD_TERMS) {
+    const data = await cachedFetch<{ results?: { id: number }[] }>('/search/keyword', { query: term }, 30 * DAY);
+    for (const k of data?.results ?? []) ids.add(String(k.id));
+  }
+  const list = [...ids];
+  adultKeywordCache = { ids: list, expiresAt: Date.now() + 30 * DAY };
+  return list;
+}
+
 // Découverte ciblée : sert à remplir chaque catégorie du flux Explorer (ex. les
 // animés, quasi absents des « tendances »). `genres` = ids TMDb, `language` =
 // langue d'origine (ex. 'ja' pour l'anime japonais).
@@ -316,6 +339,9 @@ export async function tmdbDiscover(
   };
   if (opts.genres?.length) params.with_genres = opts.genres.join(',');
   if (opts.language) params.with_original_language = opts.language;
+  // Exclusion à la source du porno : /discover supporte `without_keywords`.
+  const adultKw = await getAdultKeywordIds();
+  if (adultKw.length) params.without_keywords = adultKw.join(',');
   const dateField = type === 'tv' ? 'first_air_date' : 'primary_release_date';
   if (opts.yearGte) params[`${dateField}.gte`] = `${opts.yearGte}-01-01`;
   if (opts.yearLte) params[`${dateField}.lte`] = `${opts.yearLte}-12-31`;
