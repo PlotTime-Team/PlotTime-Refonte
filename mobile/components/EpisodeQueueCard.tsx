@@ -94,14 +94,14 @@ const styles = StyleSheet.create({
     borderRadius: 10, minHeight: 96, overflow: 'hidden', ...SHADOW.card,
   },
   cardWatched: { opacity: 0.45 },
-  thumb: { width: 92, backgroundColor: '#e5e5e5' },
+  thumb: { width: 92, backgroundColor: COLORS.imagePlaceholder },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 10, gap: 5 },
   // Le code (S03 | E02) reste sur UNE ligne ; « +N » (restants) ne le pousse jamais.
   codeRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  code: { fontSize: 17, fontFamily: FONTS.bold, flexShrink: 1 },
+  code: { color: COLORS.text, fontSize: 17, fontFamily: FONTS.bold, flexShrink: 1 },
   plus: { fontSize: 12, fontFamily: FONTS.bold, color: COLORS.textMuted, flexShrink: 0 },
-  epTitle: { fontFamily: FONTS.regular, fontSize: 12.5 },
+  epTitle: { color: COLORS.text, fontFamily: FONTS.regular, fontSize: 12.5 },
   badges: { flexDirection: 'row', gap: 6 },
   checkWrap: { justifyContent: 'center', paddingRight: 12 },
 });

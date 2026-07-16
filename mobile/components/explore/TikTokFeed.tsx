@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   chip: { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 },
   chipOn: { backgroundColor: COLORS.yellow },
   chipText: { fontFamily: FONTS.extraBold, fontSize: 12, letterSpacing: 0.2, color: '#fff' },
-  chipTextOn: { color: COLORS.black },
+  chipTextOn: { color: COLORS.onAccent },
   commentBar: {
     position: 'absolute',
     left: 14,

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../db/client.js';
 import { requireAuth } from '../auth/routes.js';
-import { igdbGame, igdbSearch, igdbToMedia, igdbImageUrl } from '../../services/igdb/index.js';
+import { igdbGame, igdbRelated, igdbSearch, igdbToMedia, igdbImageUrl, isMainGame } from '../../services/igdb/index.js';
 import { nextFavoriteOrder } from '../media/favorites.js';
 import { scheduleRecompute } from '../gamification/service.js';
 
@@ -36,16 +36,51 @@ function serializeGame(m: { id: string; title: string; posterPath: string | null
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
 
+  // Recherche jeux : BIBLIOTHÈQUE LOCALE d'abord (même comportement que la
+  // recherche séries/films), puis IGDB, dédupliqué par igdbId. Les jeux déjà
+  // connus renvoient leur id local (`id`) et `inLibrary` pour la coche jaune.
   app.get('/api/games/search', async (request) => {
     const { q } = z.object({ q: z.string().default('') }).parse(request.query ?? {});
     if (q.trim().length < 2) return { results: [] };
-    const games = await igdbSearch(q.trim());
+    const needle = q.trim();
+    const local = await prisma.media.findMany({
+      where: {
+        type: 'game',
+        OR: [
+          { title: { contains: needle } },
+          { originalTitle: { contains: needle } },
+          { localizedTitle: { contains: needle } },
+        ],
+        // Éditions (Deluxe, GOTY…) et extensions/DLC importées : jamais dans
+        // la recherche — elles vivent dans la section dédiée de la fiche.
+        NOT: { game: { isDlc: true } },
+      },
+      include: { statuses: { where: { userId: request.userId } } },
+      take: 10,
+    });
+    const seen = new Set(local.map((m) => m.igdbId).filter(Boolean));
+    const games = await igdbSearch(needle).catch(() => []);
     return {
-      results: games.map((g) => ({
-        igdbId: String(g.id), title: g.name,
-        year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
-        posterPath: g.cover ? igdbImageUrl(g.cover.image_id) : null,
-      })),
+      results: [
+        ...local.map((m) => ({
+          id: m.id,
+          igdbId: m.igdbId,
+          title: m.localizedTitle ?? m.title,
+          year: m.year,
+          posterPath: m.posterPath,
+          inLibrary: m.statuses.length > 0,
+        })),
+        ...games
+          .filter((g) => !seen.has(String(g.id)))
+          .map((g) => ({
+            id: null,
+            igdbId: String(g.id),
+            title: g.name,
+            year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
+            posterPath: g.cover ? igdbImageUrl(g.cover.image_id) : null,
+            inLibrary: false,
+          })),
+      ],
     };
   });
 
@@ -192,11 +227,45 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
     // par igdbQuery) — pas de nouvelle colonne DB pour ça.
     let videoId: string | null = null;
     let criticScore: number | null = null;
+    // Éditions (Deluxe, GOTY…) et extensions/DLC du jeu — section à défilement
+    // latéral de la fiche (façon app Xbox), croisée avec la bibliothèque.
+    type RelatedOut = {
+      igdbId: string; localId: string | null; inLibrary: boolean;
+      title: string; year: number | null; posterPath: string | null;
+      kind: 'edition' | 'extension';
+    };
+    let related: RelatedOut[] = [];
     if (fresh!.igdbId) {
       const g = await igdbGame(Number(fresh!.igdbId));
       videoId = g?.videos?.[0]?.video_id ?? null;
       // Note presse agrégée IGDB (0-100) — équivalent le plus proche de Metacritic.
       criticScore = typeof g?.aggregated_rating === 'number' ? Math.round(g.aggregated_rating) : null;
+      // Rattrapage : les jeux importés avant le marquage isDlc sont recalés
+      // ici (une édition déjà en base disparaît alors de la recherche).
+      if (g && fresh!.game && fresh!.game.isDlc !== !isMainGame(g)) {
+        await prisma.game.update({ where: { mediaId: fresh!.id }, data: { isDlc: !isMainGame(g) } });
+      }
+      const rel = await igdbRelated(Number(fresh!.igdbId));
+      if (rel.length) {
+        const ids = rel.map((r) => String(r.id));
+        const locals = await prisma.media.findMany({
+          where: { type: 'game', igdbId: { in: ids } },
+          select: { id: true, igdbId: true, statuses: { where: { userId: request.userId }, select: { id: true } } },
+        });
+        const byIgdb = new Map(locals.map((l) => [l.igdbId, l]));
+        related = rel.map((r) => {
+          const local = byIgdb.get(String(r.id));
+          return {
+            igdbId: String(r.id),
+            localId: local?.id ?? null,
+            inLibrary: (local?.statuses.length ?? 0) > 0,
+            title: r.name,
+            year: r.first_release_date ? new Date(r.first_release_date * 1000).getFullYear() : null,
+            posterPath: r.cover ? igdbImageUrl(r.cover.image_id) : null,
+            kind: r.version_parent === Number(fresh!.igdbId) ? 'edition' : 'extension',
+          };
+        });
+      }
     }
     return {
       ...serializeGame(fresh!, status),
@@ -207,6 +276,7 @@ export async function gamesRoutes(app: FastifyInstance): Promise<void> {
       isFavorite: status?.isFavorite ?? false,
       videoId,
       criticScore,
+      related,
     };
   });
 

@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Gamification côté serveur (XP, badges, streaks, défis, classement hebdo)
+Dernière mise à jour : **2026-07-16** (Claude) — Gamification complète (XP, badges, streaks, défis, classement) + jeux : recherche limitée aux jeux de base, section « Éditions et extensions »
 
 ---
 
@@ -106,6 +106,54 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
   l'historique de visionnage de « À voir ». Une sortie manquée reste visible
   14 jours.
 - `pastGroupLabel` ajouté à `packages/core` (testé).
+### 2026-07-16 — Claude (3)
+- **Recherche jeux : jeux de base uniquement** — les éditions (Deluxe,
+  collector, GOTY… = `version_parent` IGDB) et extensions/DLC/updates sont
+  exclues des résultats, y compris celles déjà importées en base (marquage
+  `game.isDlc` à l'import + rattrapage automatique à l'ouverture de la fiche).
+- **Fiche jeu : section « Éditions et extensions »** (défilement latéral façon
+  app Xbox, avant Commentaires) : cartes jaquette + nom + type (Édition /
+  Extension), badge coche jaune si déjà en bibliothèque. Clic → fiche
+  descriptive standard (import IGDB silencieux si besoin) où l'on peut mettre
+  Voulu / En cours / Terminé / Abandonné comme n'importe quel jeu. Données via
+  `where parent_game = X | version_parent = X` (IGDB, cache 7 j).
+- Tests : 85 verts (2 nouveaux avec cache IGDB simulé — zéro réseau) ;
+  vérifié au navigateur 8/8 (recherche filtrée, section affichée avant
+  Commentaires, clic extension → fiche + mise en « Voulus » confirmée serveur).
+
+### 2026-07-16 — Claude (2)
+- **Recherche Explorer : rangée d'onglets corrigée** — « SÉRIES ET FILMS » se
+  repliait sur deux lignes (rangée bancale, soulignement décalé) : police 12,5
+  + une seule ligne garantie, les trois onglets sont alignés.
+- **Les jeux ne sortent plus dans « SÉRIES ET FILMS »** : la recherche médias
+  interrogeait la base locale SANS filtre de type — les jeux IGDB importés
+  (ex. Clair Obscur: Expedition 33 + ses éditions) ressortaient étiquetés
+  « Film ». Filtre `type IN (show, movie)` + test de non-régression (83 tests
+  serveur verts).
+- **Recherche JEUX alignée sur séries/films** : bibliothèque locale d'abord
+  (id local + coche « déjà ajouté »), puis IGDB dédupliqué par igdbId — un jeu
+  déjà en bibliothèque s'ouvre directement (sans repasser par l'import) et
+  reste trouvable même sans clé IGDB.
+
+### 2026-07-16 — Claude
+- **Paramètres** : onglet « À VENIR » supprimé (placeholder jamais développé) ;
+  respiration ajoutée entre « RESYNCHRONISER MA BIBLIOTHÈQUE » et son texte
+  d'aide (12 px).
+- **Profil : tirer-pour-actualiser** façon Instagram (composant `PullToRefresh`
+  maison, ressort + pastille, compatible web) — vérifié : le tirage relance
+  bien `/api/profile`.
+- **Tri des préférés respecté PARTOUT** : les sections « Séries/Films/Jeux
+  préférés » du profil appliquent désormais le tri choisi sur leurs pages
+  (avant : toujours l'ordre utilisateur). La page « Jeux préférés » reçoit sa
+  rangée TRIER PAR + feuille de tri (comme séries/films), tri persisté.
+- **Session QA complète au navigateur** (32 écrans parcourus comme un
+  utilisateur : onglets, sous-onglets, fiches série/jeu, menus, favoris,
+  bibliothèques, social, stats, badges, classement, notifications, profils
+  publics, paramètres, import, comptes liés, édition de profil) : aucune
+  erreur JS, aucune page vide, aucun bouton mort détecté. Les alertes du
+  robot (« DÉCOUVRIR » manquant, page Bob vide) étaient de faux positifs —
+  l'Explorer fusionné de Benjamin embarque déjà le tirer-pour-actualiser via
+  sa variante `PullToRefreshView`.
 
 ### 2026-07-16 — Circuit « Arrêté » vérifié + finitions
 - Audit du circuit « Arrêter de regarder » : fiche → statut `abandoned`,
@@ -166,6 +214,35 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 > Entrée type : `### AAAA-MM-JJ — Auteur` puis une liste courte de ce qui a changé.
 
+### 2026-07-15 — Claude
+- **Thèmes : Sombre + Sunset réellement fonctionnels** (Paramètres >
+  Application > Thème : Système / Clair / Sombre / **Sunset**) :
+  - `lib/theme.ts` : trois palettes complètes ; les clés COLORS deviennent des
+    RÔLES (`white` = surface, `black` = texte fort, `pageMuted`, `onAccent` =
+    texte sur l'accent, `imagePlaceholder`…), donc tous les styles existants
+    sont thémables sans réécriture. **Sunset** : palette chaude inspirée de la
+    charte Claude.ai (fonds crème #FAF5EE, texte brun #40332A, accent
+    terracotta #E2854F, liens cuivrés) — pas un copier-coller.
+  - Application : préférence en localStorage lue au chargement (avant les
+    StyleSheet) ; changer de thème sauvegarde côté serveur PUIS recharge la
+    web app (comme X/Twitter). `system` suit prefers-color-scheme. Sur l'app
+    native, le thème suit l'appareil (note affichée dans les réglages).
+  - **Balayage complet** : `color: COLORS.text` ajouté à tous les styles de
+    texte sans couleur (31 fichiers) ; surfaces en dur (#fff, #f2f2f2,
+    #e5e5e5…) remplacées par les rôles ; textes/icônes posés sur l'accent
+    passés à `onAccent` (boutons jaunes, FAB, chips actives, badge NOUVEAU…) ;
+    badge noir PREMIERE fixe dans tous les thèmes ; gris en dur illisibles en
+    sombre corrigés ; barre d'état + fond du document + meta theme-color web
+    suivent le thème ; en-têtes sombres by design (profil public, page acteur)
+    conservés.
+- **« Nom d'utilisateur » = nom d'affichage** : les Paramètres lisaient le
+  store local figé à la connexion (« Etienne P. » malgré le profil renommé
+  « Yggdrasil ») → la valeur vient désormais du profil serveur, et « Modifier
+  le profil » met aussi à jour le store immédiatement.
+- Vérifié au navigateur (8/8) : bascule Sombre → fonds/textes sombres corrects
+  + préférence persistée localement ET côté serveur, Sunset → crème/terracotta,
+  retour Clair, et nom d'utilisateur = displayName serveur. Captures des
+  onglets Séries/Paramètres/fiche dans les trois thèmes.
 ### 2026-07-15 — Jeux vidéo : parité fiche avec séries/films (Claude)
 - Objectif : la fiche jeu offre la même expérience que la fiche série/film — menu
   « … », personnalisation jaquette/bannière, favoris, listes, partage, aperçu

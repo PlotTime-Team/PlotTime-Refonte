@@ -5,14 +5,14 @@ import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import { COLORS, FONTS } from '@/lib/theme';
+import { COLORS, FONTS, applyThemePreference, getThemePreference, type ThemePreference } from '@/lib/theme';
 import { PageHeader } from '@/components/PageHeader';
 import { FadeSwitch, PopIn } from '@/components/anim';
 import { useReduceMotion } from '@/lib/useReduceMotion';
 
 const NATIVE = Platform.OS !== 'web';
 
-const TABS = ['COMPTE', 'APPLICATION', 'À VENIR'];
+const TABS = ['COMPTE', 'APPLICATION'];
 
 export default function Settings() {
   const [tab, setTab] = useState('COMPTE');
@@ -30,7 +30,7 @@ export default function Settings() {
       {/* Bascule d'onglet en fondu, comme les onglets hauts des autres écrans. */}
       <FadeSwitch trigger={tab}>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          {tab === 'COMPTE' ? <AccountTab /> : tab === 'APPLICATION' ? <AppTab /> : <UpcomingTab />}
+          {tab === 'COMPTE' ? <AccountTab /> : <AppTab />}
         </ScrollView>
       </FadeSwitch>
     </View>
@@ -42,6 +42,14 @@ function AccountTab() {
   const { user, logout } = useAppStore();
   const [pwOpen, setPwOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  // Nom d'utilisateur = nom d'affichage COURANT (source : profil serveur).
+  // Le store local est figé à la connexion : après « Modifier le profil »,
+  // il affichait encore l'ancien nom.
+  const profileQ = useQuery({
+    queryKey: ['profile'],
+    queryFn: () => api.get<{ user: { displayName?: string } }>('/api/profile'),
+  });
+  const displayName = profileQ.data?.user?.displayName ?? user?.displayName ?? '';
 
   // Exporter : télécharge un JSON de toutes ses données (web) / partage (natif).
   const exportData = async () => {
@@ -66,7 +74,7 @@ function AccountTab() {
     <View>
       <SectionTitle>Identification</SectionTitle>
       <View style={{ paddingHorizontal: 24, paddingBottom: 8 }}>
-        <Field label="Nom d'utilisateur" value={user?.displayName ?? ''} blue />
+        <Field label="Nom d'utilisateur" value={displayName} blue />
         <Field label="Adresse e-mail" value={user?.email || '—'} blue />
         <Field label="Identifiant utilisateur" value={user?.id ?? ''} />
       </View>
@@ -220,7 +228,7 @@ function ResyncLibraryRow() {
       ) : mut.isError ? (
         <Text style={styles.errMsg}>Impossible de contacter le serveur.</Text>
       ) : (
-        <Text style={styles.steamHint}>
+        <Text style={[styles.steamHint, { marginTop: 12 }]}>
           Rattrape les dates de diffusion manquantes après un import (séries qui n'apparaissent pas dans « À voir »).
         </Text>
       )}
@@ -261,7 +269,7 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
           <TextInput style={styles.mInput} secureTextEntry value={next} onChangeText={setNext} autoCapitalize="none" placeholder="8 caractères minimum" placeholderTextColor={COLORS.textSoft} />
           {error ? <Text style={styles.errMsg}>{error}</Text> : null}
           <Pressable style={[styles.mBtn, !canSubmit && { opacity: 0.4 }]} disabled={!canSubmit} onPress={() => { setError(null); mut.mutate(); }}>
-            {mut.isPending ? <ActivityIndicator color={COLORS.black} /> : <Text style={styles.mBtnText}>ENREGISTRER</Text>}
+            {mut.isPending ? <ActivityIndicator color={COLORS.onAccent} /> : <Text style={styles.mBtnText}>ENREGISTRER</Text>}
           </Pressable>
         </>
       )}
@@ -336,15 +344,40 @@ function AppTab() {
     onSettled: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   });
   const s = data?.settings ?? {};
+  // Thème : la préférence EFFECTIVE vient du stockage local (c'est elle qui a
+  // servi à peindre cette session) ; le serveur n'en garde qu'une copie.
+  const [themePref, setThemePref] = useState<ThemePreference>(getThemePreference());
+  const pickTheme = async (v: ThemePreference) => {
+    if (v === themePref) return;
+    setThemePref(v);
+    // Sauvegarde serveur d'abord (le rechargement web coupe les requêtes en vol).
+    try { await api.post('/api/settings', { theme: v }); } catch { /* best-effort */ }
+    qc.invalidateQueries({ queryKey: ['settings'] });
+    // Puis application : les couleurs étant figées dans les styles au
+    // chargement, la web app se recharge (comme le fait X/Twitter).
+    applyThemePreference(v);
+  };
   return (
     <View>
       <SectionTitle>Titres</SectionTitle>
       <ToggleRow label="Afficher dans votre langue" sub="Les titres s'affichent par défaut en anglais" on={s.titlesInUserLanguage ?? true} onToggle={(v) => update.mutate({ titlesInUserLanguage: v })} />
       <Divider />
       <SectionTitle>Thème</SectionTitle>
-      {[['system', "Suivre le thème défini sur l'appareil"], ['light', 'Thème clair'], ['dark', 'Thème sombre']].map(([v, l]) => (
-        <RadioRow key={v} label={l} on={(s.theme ?? 'light') === v} onPress={() => update.mutate({ theme: v })} />
+      {(
+        [
+          ['system', "Suivre le thème défini sur l'appareil"],
+          ['light', 'Thème clair'],
+          ['dark', 'Thème sombre'],
+          ['sunset', 'Thème Sunset'],
+        ] as [ThemePreference, string][]
+      ).map(([v, l]) => (
+        <RadioRow key={v} label={l} on={themePref === v} onPress={() => pickTheme(v)} />
       ))}
+      {Platform.OS !== 'web' ? (
+        <Text style={styles.themeNote}>
+          Sur l'app native, le thème suit l'appareil ; le choix explicite s'applique sur la web app.
+        </Text>
+      ) : null}
       <Divider />
       <SectionTitle>Cache</SectionTitle>
       <View style={{ padding: 16 }}>
@@ -357,23 +390,13 @@ function AppTab() {
   );
 }
 
-function UpcomingTab() {
-  return (
-    <View>
-      <SectionTitle>Épisodes à afficher</SectionTitle>
-      <Row label="Choix des chaînes" />
-      <ToggleRow label="Masquer les épisodes vus" on={false} onToggle={() => {}} />
-    </View>
-  );
-}
-
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 function Field({ label, value, blue }: { label: string; value: string; blue?: boolean }) {
   return (
     <View style={{ paddingVertical: 12 }}>
-      <Text style={{ fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: COLORS.text, fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
       <Text style={{ fontFamily: FONTS.regular, fontSize: 14, color: blue ? COLORS.blue : COLORS.textMuted }}>{value}</Text>
     </View>
   );
@@ -381,7 +404,7 @@ function Field({ label, value, blue }: { label: string; value: string; blue?: bo
 function Row({ label, onPress }: { label: string; onPress?: () => void }) {
   return (
     <Pressable style={styles.row} onPress={onPress}>
-      <Text style={{ fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: COLORS.text, fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
       <Feather name="chevron-right" size={20} color={COLORS.black} />
     </Pressable>
   );
@@ -397,11 +420,11 @@ function ToggleRow({ label, sub, on, onToggle }: { label: string; sub?: string; 
   return (
     <View style={styles.toggleRow}>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
+        <Text style={{ color: COLORS.text, fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
         {sub ? <Text style={{ fontFamily: FONTS.regular, fontSize: 12.5, color: COLORS.textMuted, lineHeight: 17, marginTop: 2 }}>{sub}</Text> : null}
       </View>
       <Pressable onPress={() => onToggle(!on)} hitSlop={8}>
-        <Animated.View style={[styles.toggle, { backgroundColor: v.interpolate({ inputRange: [0, 1], outputRange: ['#dddddd', COLORS.yellow] }) }]}>
+        <Animated.View style={[styles.toggle, { backgroundColor: v.interpolate({ inputRange: [0, 1], outputRange: [COLORS.chipSelected, COLORS.yellow] }) }]}>
           <Animated.View
             style={[
               styles.knob,
@@ -427,7 +450,7 @@ function RadioRow({ label, on, onPress }: { label: string; on: boolean; onPress:
           </PopIn>
         ) : null}
       </View>
-      <Text style={{ fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: COLORS.text, fontFamily: FONTS.regular, fontSize: 14 }}>{label}</Text>
     </Pressable>
   );
 }
@@ -442,31 +465,32 @@ const styles = StyleSheet.create({
   tabActive: { color: COLORS.black },
   under: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, backgroundColor: 'transparent' },
   underActive: { backgroundColor: COLORS.black },
-  sectionTitle: { fontSize: 16, fontFamily: FONTS.extraBold, paddingHorizontal: 24, paddingTop: 16 },
+  sectionTitle: { color: COLORS.text, fontSize: 16, fontFamily: FONTS.extraBold, paddingHorizontal: 24, paddingTop: 16 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 11 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 11, gap: 16 },
   toggle: { width: 52, height: 30, borderRadius: 15, padding: 3 },
   knob: { width: 24, height: 24, borderRadius: 12 },
-  radio: { width: 26, height: 26, borderRadius: 13, borderWidth: 2.5, borderColor: '#4a4a52', alignItems: 'center', justifyContent: 'center' },
+  radio: { width: 26, height: 26, borderRadius: 13, borderWidth: 2.5, borderColor: COLORS.textMuted, alignItems: 'center', justifyContent: 'center' },
   radioSel: { borderColor: COLORS.black },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.black },
   divider: { height: 1, backgroundColor: COLORS.borderLight, marginVertical: 12 },
   logoutBtn: { backgroundColor: COLORS.yellow, borderRadius: 999, marginHorizontal: 16, paddingVertical: 14, alignItems: 'center' },
-  logoutText: { fontSize: 15, fontFamily: FONTS.extraBold, letterSpacing: 0.6 },
+  logoutText: { color: COLORS.onAccent, fontSize: 15, fontFamily: FONTS.extraBold, letterSpacing: 0.6 },
   deleteText: { fontSize: 14, fontFamily: FONTS.extraBold, letterSpacing: 0.6, color: COLORS.blue, textAlign: 'center' },
   cacheBtn: { backgroundColor: COLORS.yellow, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
-  cacheText: { fontSize: 14, fontFamily: FONTS.extraBold, letterSpacing: 0.6 },
+  cacheText: { color: COLORS.onAccent, fontSize: 14, fontFamily: FONTS.extraBold, letterSpacing: 0.6 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', paddingHorizontal: 24 },
   sheet: { backgroundColor: COLORS.white, borderRadius: 16, padding: 20 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sheetTitle: { fontSize: 16, fontFamily: FONTS.extraBold },
+  sheetTitle: { color: COLORS.text, fontSize: 16, fontFamily: FONTS.extraBold },
   steamHint: { fontSize: 14, fontFamily: FONTS.regular, color: COLORS.textMuted, lineHeight: 19, marginBottom: 10 },
-  mLabel: { fontSize: 14, fontFamily: FONTS.bold, marginTop: 14 },
-  mInput: { borderBottomWidth: 1, borderBottomColor: COLORS.border, fontSize: 15, fontFamily: FONTS.regular, paddingVertical: 9, marginTop: 6 },
+  mLabel: { color: COLORS.text, fontSize: 14, fontFamily: FONTS.bold, marginTop: 14 },
+  mInput: { color: COLORS.text, borderBottomWidth: 1, borderBottomColor: COLORS.border, fontSize: 15, fontFamily: FONTS.regular, paddingVertical: 9, marginTop: 6 },
   mBtn: { backgroundColor: COLORS.yellow, borderRadius: 999, paddingVertical: 12, alignItems: 'center', marginTop: 22 },
-  mBtnText: { fontSize: 13, fontFamily: FONTS.extraBold, letterSpacing: 0.6 },
+  mBtnText: { color: COLORS.onAccent, fontSize: 13, fontFamily: FONTS.extraBold, letterSpacing: 0.6 },
   okMsg: { fontSize: 14, fontFamily: FONTS.bold, color: COLORS.green, textAlign: 'center', paddingVertical: 16 },
   errMsg: { color: COLORS.red, fontSize: 14, fontFamily: FONTS.regular, marginTop: 12 },
   warn: { fontSize: 15, fontFamily: FONTS.regular, color: COLORS.textMuted, lineHeight: 21, marginBottom: 8 },
   version: { textAlign: 'center', paddingVertical: 24, fontSize: 13, fontFamily: FONTS.bold, color: COLORS.textMuted, letterSpacing: 1 },
+  themeNote: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.textMuted, paddingHorizontal: 24, paddingTop: 4, lineHeight: 18 },
 });

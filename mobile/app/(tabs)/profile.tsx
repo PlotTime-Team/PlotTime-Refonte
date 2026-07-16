@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image, Dimensions, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, Dimensions, Platform } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,6 +14,9 @@ import { Loading, LoadError, Poster } from '@/components/ui';
 import { AppearItem, PopIn } from '@/components/anim';
 import { useTabResetSeq } from '@/lib/tabReset';
 import { usePullRefresh } from '@/lib/usePullRefresh';
+import { PullToRefresh } from '@/components/PullToRefresh';
+import { sortFavorites } from '@/components/favorites';
+import { useAppStore } from '@/lib/store';
 
 export type ProfileUser = {
   displayName: string;
@@ -79,6 +82,8 @@ function ProfileScreenInner() {
   });
 
   const { refreshing, onRefresh } = usePullRefresh([refetch]);
+  // Tri choisi sur les pages « préférés » (persisté) : appliqué aussi ici.
+  const favSort = useAppStore((s) => s.favSort);
 
   if (isLoading) return <Loading />;
   if (!data) return <LoadError onRetry={refetch} busy={isRefetching} />;
@@ -87,10 +92,13 @@ function ProfileScreenInner() {
   const mt = watchTime(stats.movieMinutes);
 
   return (
-    <ScrollView
+    // Tirer-pour-actualiser façon Instagram (ressort) — le RefreshControl RN
+    // ne fonctionne pas sur la web app, notre PullToRefresh oui (web + natif).
+    <PullToRefresh
+      refreshing={refreshing}
+      onRefresh={onRefresh}
       style={{ flex: 1, backgroundColor: COLORS.white }}
       contentContainerStyle={{ paddingBottom: 24 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
     >
       {/* Icônes de la barre de statut en clair sur la couverture sombre (natif). */}
       {focused ? <StatusBar style="light" /> : null}
@@ -109,7 +117,7 @@ function ProfileScreenInner() {
           accessibilityRole="button"
           accessibilityLabel="Notifications"
         >
-          <Feather name="bell" size={20} color={COLORS.black} />
+          <Feather name="bell" size={20} color={COLORS.onAccent} />
           {unread > 0 ? (
             // La pastille de non-lus arrive avec un petit rebond.
             <PopIn style={styles.badge}>
@@ -213,12 +221,15 @@ function ProfileScreenInner() {
       ) : null}
 
       <PosterRow title="Séries" items={data.shows} emptyLabel="Aucune série suivie" href="/library/shows" />
-      <PosterRow title="Séries préférées" items={data.favoriteShows} heart emptyLabel="Aucune série en favori" href="/library/favorite-shows" />
+      {/* Les sections « préférés » respectent le TRI choisi sur leurs pages
+          (Trier par : ordre utilisateur, derniers ajouts, A-Z…) — avant, le
+          profil restait figé sur l'ordre utilisateur. */}
+      <PosterRow title="Séries préférées" items={sortFavorites(data.favoriteShows, favSort.show)} heart emptyLabel="Aucune série en favori" href="/library/favorite-shows" />
       <PosterRow title="Films" items={data.movies} isMovie emptyLabel="Aucun film ajouté" href="/library/movies" />
-      <PosterRow title="Films préférés" items={data.favoriteMovies} isMovie heart emptyLabel="Aucun film en favori" href="/library/favorite-movies" />
+      <PosterRow title="Films préférés" items={sortFavorites(data.favoriteMovies, favSort.movie)} isMovie heart emptyLabel="Aucun film en favori" href="/library/favorite-movies" />
       <PosterRow title="Jeux" items={data.games ?? []} isGame emptyLabel="Aucun jeu joué" href="/games" />
-      <PosterRow title="Jeux préférés" items={data.favoriteGames ?? []} isGame heart emptyLabel="Aucun jeu en favori" href="/library/favorite-games" />
-    </ScrollView>
+      <PosterRow title="Jeux préférés" items={sortFavorites(data.favoriteGames ?? [], favSort.game)} isGame heart emptyLabel="Aucun jeu en favori" href="/library/favorite-games" />
+    </PullToRefresh>
   );
 }
 
@@ -394,16 +405,16 @@ const styles = StyleSheet.create({
   counters: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
   counter: { flex: 1, alignItems: 'center', paddingVertical: 11 },
   counterBorder: { borderLeftWidth: 1, borderLeftColor: COLORS.borderLight },
-  counterN: { fontSize: 18, fontFamily: FONTS.extraBold },
-  counterL: { fontFamily: FONTS.regular, fontSize: 13 },
+  counterN: { color: COLORS.text, fontSize: 18, fontFamily: FONTS.extraBold },
+  counterL: { color: COLORS.text, fontFamily: FONTS.regular, fontSize: 13 },
   sectHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 9 },
-  sectTitle: { fontSize: 18, fontFamily: FONTS.extraBold },
+  sectTitle: { color: COLORS.text, fontSize: 18, fontFamily: FONTS.extraBold },
   statcard: { width: 268, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10 },
   statTop: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
-  statTitle: { fontSize: 14, fontFamily: FONTS.semiBold },
+  statTitle: { color: COLORS.text, fontSize: 14, fontFamily: FONTS.semiBold },
   statVals: { flexDirection: 'row', justifyContent: 'space-around', padding: 10 },
-  statV: { fontSize: 19, fontFamily: FONTS.extraBold },
-  statL: { fontSize: 10.5, fontFamily: FONTS.bold, letterSpacing: 0.4 },
+  statV: { color: COLORS.text, fontSize: 19, fontFamily: FONTS.extraBold },
+  statL: { color: COLORS.text, fontSize: 10.5, fontFamily: FONTS.bold, letterSpacing: 0.4 },
   listcard: { height: 132, borderRadius: 8, backgroundColor: '#2e2e38', justifyContent: 'flex-end', padding: 12, overflow: 'hidden' },
   listShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
   listTitle: { color: '#fff', fontSize: 17, fontFamily: FONTS.extraBold },

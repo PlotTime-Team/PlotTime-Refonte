@@ -78,9 +78,12 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
       return { results: people };
     }
 
-    // Séries et films : local + TMDb.
+    // Séries et films : local + TMDb. Le filtre de type est indispensable :
+    // sans lui, les JEUX importés (IGDB) ressortaient dans « Séries et films »
+    // étiquetés « Film » (ex. Clair Obscur: Expedition 33 + ses éditions).
     const local = await prisma.media.findMany({
       where: {
+        type: { in: ['show', 'movie'] },
         OR: [
           { title: { contains: q } },
           { originalTitle: { contains: q } },

@@ -30,7 +30,15 @@ type FeedItem = {
 type PublicUser = { id: string; displayName: string; avatarUrl: string | null; isFollowing?: boolean };
 
 // Miroir de DiscoverGameDto (games.tsx) : posterPath est une URL IGDB absolue.
-type GameSearchResultDto = { igdbId: string; title: string; year: number | null; posterPath: string | null };
+type GameSearchResultDto = {
+  // Jeu déjà en base : id local direct (fiche ouvrable sans import IGDB).
+  id: string | null;
+  igdbId: string | null;
+  title: string;
+  year: number | null;
+  posterPath: string | null;
+  inLibrary?: boolean;
+};
 
 export default function ExploreScreen() {
   // Re-clic sur l'onglet « Explorer » : remontage complet (recherche + flux réinitialisés).
@@ -107,7 +115,11 @@ function ExploreScreenInner() {
 function SearchTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable style={[styles.tab, active && styles.tabActive]} onPress={onPress}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+      {/* Une seule ligne, toujours : « SÉRIES ET FILMS » ne doit jamais se
+          replier (rangée bancale, soulignement décalé). */}
+      <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -265,10 +277,17 @@ function GameResults({ query, rawQuery }: { query: string; rawQuery: string }) {
     placeholderData: keepPreviousData,
   });
 
-  // Consultation seule : ajoute (sans suivre) puis ouvre la fiche.
+  const keyOf = (r: GameSearchResultDto) => r.id ?? r.igdbId ?? r.title;
+
+  // Consultation seule : fiche locale directe si le jeu est déjà connu, sinon
+  // import IGDB silencieux puis ouverture.
   const open = async (r: GameSearchResultDto) => {
     if (openingKey || addingKey) return;
-    setOpeningKey(r.igdbId);
+    if (r.id) {
+      router.push(('/game/' + r.id) as Href);
+      return;
+    }
+    setOpeningKey(keyOf(r));
     try {
       const res = await api.post<{ mediaId: string | null }>('/api/games/add-from-igdb', { igdbId: r.igdbId });
       if (res.mediaId) router.push(('/game/' + res.mediaId) as Href);
@@ -280,10 +299,11 @@ function GameResults({ query, rawQuery }: { query: string; rawQuery: string }) {
   // Le + : suit le jeu (statut « Voulus »), sans quitter la liste.
   const add = async (r: GameSearchResultDto) => {
     if (addingKey) return;
-    setAddingKey(r.igdbId);
+    setAddingKey(keyOf(r));
     try {
-      await api.post('/api/games/add-from-igdb', { igdbId: r.igdbId, status: 'wishlist' });
-      setFollowed((f) => ({ ...f, [r.igdbId]: true }));
+      if (r.id) await api.post(`/api/games/${r.id}/status`, { status: 'wishlist' });
+      else await api.post('/api/games/add-from-igdb', { igdbId: r.igdbId, status: 'wishlist' });
+      setFollowed((f) => ({ ...f, [keyOf(r)]: true }));
       queryClient.invalidateQueries({ queryKey: ['games', 'library'] });
     } finally {
       setAddingKey(null);
@@ -300,9 +320,10 @@ function GameResults({ query, rawQuery }: { query: string; rawQuery: string }) {
     <ScrollView contentContainerStyle={{ paddingBottom: 24, paddingTop: 6 }} keyboardShouldPersistTaps="handled">
       {results.map((r, i) => {
         const poster = tmdbImage(r.posterPath, 'w185');
-        const isFollowed = followed[r.igdbId];
+        const key = keyOf(r);
+        const isFollowed = followed[key] || r.inLibrary;
         return (
-          <AppearItem key={r.igdbId} index={i}>
+          <AppearItem key={key} index={i}>
             <Pressable style={styles.resultRow} onPress={() => open(r)}>
               {poster ? (
                 <Image source={{ uri: poster }} style={styles.resultPoster} resizeMode="cover" />
@@ -320,7 +341,7 @@ function GameResults({ query, rawQuery }: { query: string; rawQuery: string }) {
                   <Text style={styles.resultMeta}>{['Jeu', r.year].filter(Boolean).join(' · ')}</Text>
                 </View>
               </View>
-              {openingKey === r.igdbId || addingKey === r.igdbId ? (
+              {openingKey === key || addingKey === key ? (
                 <View style={styles.addSquareGhost}>
                   <ActivityIndicator color={COLORS.black} size="small" />
                 </View>
@@ -415,18 +436,20 @@ const styles = StyleSheet.create({
   // Barre de recherche recalée sur TV Time (comparaison px) : rangée 44dp,
   // icône 20, texte 15.5 — nettement plus compacte qu'avant.
   searchbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 18, height: 44, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  input: { flex: 1, fontFamily: FONTS.regular, fontSize: 15.5, borderWidth: 0, paddingVertical: 6 },
+  input: { color: COLORS.text, flex: 1, fontFamily: FONTS.regular, fontSize: 15.5, borderWidth: 0, paddingVertical: 6 },
   cancel: { color: COLORS.blue, fontFamily: FONTS.regular, fontSize: 16 },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
   // Onglets répartis sur toute la largeur, comme TV Time.
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 3, borderBottomColor: 'transparent', marginBottom: -1 },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 2, borderBottomWidth: 3, borderBottomColor: 'transparent', marginBottom: -1 },
   tabActive: { borderBottomColor: COLORS.black },
-  tabText: { fontSize: 14, fontFamily: FONTS.extraBold, letterSpacing: 0.4, color: COLORS.textSoft },
+  // 12.5 : « SÉRIES ET FILMS » tient sur UNE ligne dans son tiers d'écran
+  // (à 14, il se repliait sur deux lignes et cassait la rangée).
+  tabText: { fontSize: 12.5, fontFamily: FONTS.extraBold, letterSpacing: 0.3, color: COLORS.textSoft },
   tabTextActive: { color: COLORS.black },
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderLight },
-  resultPoster: { width: 56, aspectRatio: 2 / 3, borderRadius: 4, backgroundColor: '#e5e5e5' },
+  resultPoster: { width: 56, aspectRatio: 2 / 3, borderRadius: 4, backgroundColor: COLORS.imagePlaceholder },
   posterEmpty: { alignItems: 'center', justifyContent: 'center' },
-  resultTitle: { fontSize: 17, fontFamily: FONTS.bold },
+  resultTitle: { color: COLORS.text, fontSize: 17, fontFamily: FONTS.bold },
   resultMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   resultMeta: { fontFamily: FONTS.regular, fontSize: 14, color: COLORS.textMuted },
   addSquare: { width: 40, height: 40, borderRadius: 10, borderWidth: 2.5, borderColor: COLORS.yellow, alignItems: 'center', justifyContent: 'center' },
@@ -436,9 +459,9 @@ const styles = StyleSheet.create({
   userTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#20202a', alignItems: 'center', justifyContent: 'center' },
   avatarInit: { color: '#fff', fontSize: 17, fontFamily: FONTS.extraBold },
-  userName: { flex: 1, fontSize: 16, fontFamily: FONTS.bold },
+  userName: { color: COLORS.text, flex: 1, fontSize: 16, fontFamily: FONTS.bold },
   followBtn: { minWidth: 96, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: COLORS.black, alignItems: 'center' },
   followingBtn: { backgroundColor: COLORS.chipGrey },
-  followText: { color: '#fff', fontFamily: FONTS.extraBold, fontSize: 13, letterSpacing: 0.4 },
+  followText: { color: COLORS.white, fontFamily: FONTS.extraBold, fontSize: 13, letterSpacing: 0.4 },
   followingText: { color: COLORS.black },
 });

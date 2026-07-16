@@ -152,7 +152,7 @@ function CommentsPanel({
           accessibilityRole="button"
           accessibilityLabel="Envoyer"
         >
-          {busy ? <ActivityIndicator color="#000" /> : <Feather name="send" size={18} color={COLORS.black} />}
+          {busy ? <ActivityIndicator color={COLORS.onAccent} /> : <Feather name="send" size={18} color={COLORS.onAccent} />}
         </Pressable>
       </View>
     </View>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.borderLight,
   },
-  composerInput: {
+  composerInput: { color: COLORS.text,
     flex: 1,
     borderWidth: 1,
     borderColor: COLORS.border,

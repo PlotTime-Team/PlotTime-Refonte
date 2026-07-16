@@ -157,5 +157,5 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     marginTop: 22,
   },
-  ficheText: { fontFamily: FONTS.extraBold, fontSize: 13, letterSpacing: 0.5, color: COLORS.black },
+  ficheText: { fontFamily: FONTS.extraBold, fontSize: 13, letterSpacing: 0.5, color: COLORS.onAccent },
 });
