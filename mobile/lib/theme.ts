@@ -110,6 +110,8 @@ const SUNSET: Palette = {
   imagePlaceholder: '#E7DBCB',
 };
 
+// NB : si un `bg` change ici, reporter la valeur dans le script pré-peinture
+// de `app/+html.tsx` (barres système Android teintées avant le premier rendu).
 const PALETTES: Record<ThemeName, Palette> = { light: LIGHT, dark: DARK, sunset: SUNSET };
 
 const STORAGE_KEY = 'serietime-theme';

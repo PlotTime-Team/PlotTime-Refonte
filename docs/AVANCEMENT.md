@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Correctif navigation : le bouton « Retour » fonctionne après un changement de thème (et sur tout écran ouvert par lien direct / rechargement) via un repli `goBack(fallback)` généralisé
+Dernière mise à jour : **2026-07-16** (Claude) — Thèmes : plus de liseré blanc en bas d'écran sur Android (barres système teintées avant le premier rendu sur la web app ; thème de l'appareil débloqué côté natif) + correctif bouton « Retour » après changement de thème
 
 ---
 
@@ -72,6 +72,34 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Claude (5)
+- **Correctif : liseré blanc en bas d'écran (barre de gestes Android) avec les
+  thèmes Sombre/Sunset.** Android échantillonne la couleur des barres système
+  au chargement de la page ; le `meta theme-color` n'était mis à jour qu'après
+  l'exécution du bundle JS → la barre de gestes restait blanche (valeur du
+  manifest). Un script « pré-peinture » dans `app/+html.tsx` lit la préférence
+  (`localStorage`, ou `prefers-color-scheme` en mode système) et applique fond
+  `<html>` + `theme-color` AVANT le premier rendu — supprime aussi le flash
+  blanc au rechargement (changement de thème). NB : si un `bg` de palette
+  change dans `lib/theme.ts`, reporter la valeur dans ce script.
+- **Natif (Android/iPhone)** : `userInterfaceStyle` passé de `light` à
+  `automatic` dans `app.json` — le verrou « clair » empêchait le thème sombre
+  de suivre l'appareil en natif. `edgeToEdgeEnabled` étant déjà actif, le bas
+  d'écran natif prend la couleur de la barre d'onglets (thémée, avec
+  `paddingBottom: insets.bottom`).
+- Vérifié au banc Playwright (17/17) : pour chaque thème (clair/sombre/
+  sunset/système), `theme-color` et fond `<html>` corrects AVANT l'exécution
+  du bundle et après chargement complet ; scénario réel « changement de thème
+  → reload déjà sombre ». (L'onglet Profil garde volontairement son
+  `theme-color` #20202a — en-tête sombre façon TV Time.)
+- **QA post-gamification** (Benjamin a fusionné XP/badges/défis sur `main`) :
+  91 tests serveur verts (après `prisma generate` — nouveaux modèles Prisma),
+  typecheck mobile 0 erreur, bancs re-joués sur le code fusionné : thèmes 8/8,
+  jeux éditions/extensions 8/8 (un « échec » = bascule de statut due à l'état
+  résiduel du banc, pas une régression), retour 16/16, parcours QA global OK
+  (3 alertes = faux positifs connus du robot), écrans Trophées/Badges/
+  Classement vérifiés en clair ET en sombre (captures).
 
 ### 2026-07-16 — Claude (4)
 - **Correctif : bouton « Retour » muet après un changement de thème.** Le
