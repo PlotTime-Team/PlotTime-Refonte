@@ -98,6 +98,11 @@ export const BLOCKLIST: Record<ModerationCategory, string[]> = {
     // fr
     'tapette',
     'tarlouze',
+    'pédé', // normalisé → « pede » (attrape « pédés »)
+    'pd', // court → frontière de mot (n'attrape pas « rapide »/« pdf »)
+    'tantouze',
+    'fiotte',
+    'enculé de sa race', // slur homophobe/haineux composé
     // es
     'maricon',
     'maricones',
