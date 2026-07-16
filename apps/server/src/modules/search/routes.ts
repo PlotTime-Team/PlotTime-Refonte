@@ -10,7 +10,7 @@ import { allowsAdultContent } from '../settings/adultContent.js';
 import { attachSocialStats } from './socialStats.js';
 import { filterSeenWithFallback, loadRecentImpressions, recordImpressions } from '../explore/impressions.js';
 import { genreProfile, pickExplorationSlug, pickWeighted, tmdbGenreBySlug, tmdbGenreWeights } from '../explore/taste.js';
-import { containsAdultContent, isKnownAdultTmdbId } from '@serietime/core';
+import { containsAdultContent, isKnownAdultTmdbId, containsAmbiguousAdultCjk } from '@serietime/core';
 
 // Contenu pornographique exclu du flux et de la recherche : marqueur TMDb
 // `adult` OU signaux porno (titre/résumé) via containsAdultContent. La violence
@@ -48,19 +48,27 @@ const ADULT_ITEM_KEYWORDS = new Set([
   // le reste du 18+ ; l'interrupteur « Contenu 18+ » le fait réapparaître.
   'ecchi',
 ]);
-// Vérification par mots-clés TMDb PAR ITEM : exclut si un mot-clé ∈ ensemble
-// adulte. `matches` restreint la portée (flux : animés seulement ; recherche :
-// tous les items avec tmdbId). Coût borné : sélection finale, en parallèle.
-// Débrayé pour les comptes 18+.
-async function dropHentaiAnime<T extends { tmdbId: string | null; type: 'show' | 'movie' }>(
+// Passe anti-porno sur la sélection FINALE (débrayée pour les comptes 18+).
+// 1) id TMDb banni (liste noire) ; 2) titre/résumé porno (marqueurs latins +
+// CJK non ambigus) ; 3) mots-clés TMDb adultes (pink film/softcore/hentai/…) ;
+// 4) marqueur CJK AMBIGU (変態/エロ/성인) MAIS uniquement si l'œuvre n'a AUCUN
+// mot-clé TMDb — les animés grand public en ont toujours, les porno obscurs à
+// titre kanji n'en ont pas → on écarte ces derniers sans toucher « 変態王子 ».
+// `matches` limite la requête /keywords (coût API) : flux = animés seulement ;
+// recherche = tous les items avec tmdbId. Les checks 1-2 sont gratuits (locaux).
+async function dropAdultResults<T extends { tmdbId: string | null; type: 'show' | 'movie'; title: string; overview: string | null }>(
   items: T[],
   matches: (item: T) => boolean,
 ): Promise<T[]> {
   const ok = await Promise.all(
     items.map(async (item) => {
+      if (isKnownAdultTmdbId(item.tmdbId)) return false;
+      if (containsAdultContent(item.title, item.overview)) return false;
       if (!item.tmdbId || !matches(item)) return true;
       const names = await tmdbKeywordNames(item.type === 'movie' ? 'movie' : 'tv', item.tmdbId);
-      return !names.some((n) => ADULT_ITEM_KEYWORDS.has(n.trim().toLowerCase()));
+      if (names.some((n) => ADULT_ITEM_KEYWORDS.has(n.trim().toLowerCase()))) return false;
+      if (names.length === 0 && containsAmbiguousAdultCjk(item.title)) return false;
+      return true;
     }),
   );
   return items.filter((_, i) => ok[i]);
@@ -242,7 +250,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     // /keywords caché 30 j → coût borné. Débrayé pour les comptes 18+.
     const finalResults = allowAdult
       ? results
-      : await dropHentaiAnime(results, (i) => i.tmdbId != null);
+      : await dropAdultResults(results, (i) => i.tmdbId != null);
     return { results: finalResults, sources };
   });
 
@@ -440,7 +448,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     });
     // Vérification hentai par mots-clés sur les items d'ANIMATION retenus
     // (catégorie « anime ») — appliquée sur la sélection FINALE, en parallèle.
-    const feed = allowAdult ? capped : await dropHentaiAnime(capped, (c) => c.category === 'anime');
+    const feed = allowAdult ? capped : await dropAdultResults(capped, (c) => c.category === 'anime');
     // Mémorise ce qui vient d'être servi (exclu des tirages pendant 3 jours).
     await recordImpressions(request.userId, feed.map(itemKey));
     const withStats = await attachSocialStats(feed, request.userId);

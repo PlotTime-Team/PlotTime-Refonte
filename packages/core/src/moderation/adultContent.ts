@@ -124,6 +124,21 @@ export function isKnownAdultTmdbId(id: string | null | undefined): boolean {
   return id != null && KNOWN_ADULT_TMDB_IDS.has(id);
 }
 
+// Marqueurs CJK/coréens AMBIGUS : « 変態 » (hentai OU métamorphose), « エロ »
+// (ero — mais « エロマンガ先生 » est mainstream), « 官能 » (sensuel), « 성인 »
+// (« adulte » coréen). Ils NE bloquent PAS à eux seuls : l'appelant ne les
+// traite comme adultes que si l'œuvre n'a AUCUN mot-clé TMDb (les animés
+// grand public en ont toujours ; les porno obscurs à titre kanji n'en ont pas).
+const AMBIGUOUS_CJK_MARKERS: readonly string[] = ['変態', 'エロ', '官能', '성인'];
+export function containsAmbiguousAdultCjk(...texts: (string | null | undefined)[]): boolean {
+  for (const raw of texts) {
+    if (typeof raw === 'string') {
+      for (const m of AMBIGUOUS_CJK_MARKERS) if (raw.includes(m)) return true;
+    }
+  }
+  return false;
+}
+
 // Liste exportée (extensible) de TOUS les marqueurs pornographiques.
 export const ADULT_MARKERS: readonly AdultMarker[] = [...SUBSTR_MARKERS, ...WORD_MARKERS];
 
