@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — QA complet + correctifs : tri des préférés répercuté sur le profil (séries/films/jeux), pull-to-refresh du Profil, Paramètres allégés
+Dernière mise à jour : **2026-07-16** (Claude) — Recherche : onglets sur une ligne, les jeux ne sortent plus en « Film » (fuite IGDB corrigée), recherche jeux = bibliothèque locale + IGDB
 
 ---
 
@@ -70,6 +70,20 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Claude (2)
+- **Recherche Explorer : rangée d'onglets corrigée** — « SÉRIES ET FILMS » se
+  repliait sur deux lignes (rangée bancale, soulignement décalé) : police 12,5
+  + une seule ligne garantie, les trois onglets sont alignés.
+- **Les jeux ne sortent plus dans « SÉRIES ET FILMS »** : la recherche médias
+  interrogeait la base locale SANS filtre de type — les jeux IGDB importés
+  (ex. Clair Obscur: Expedition 33 + ses éditions) ressortaient étiquetés
+  « Film ». Filtre `type IN (show, movie)` + test de non-régression (83 tests
+  serveur verts).
+- **Recherche JEUX alignée sur séries/films** : bibliothèque locale d'abord
+  (id local + coche « déjà ajouté »), puis IGDB dédupliqué par igdbId — un jeu
+  déjà en bibliothèque s'ouvre directement (sans repasser par l'import) et
+  reste trouvable même sans clé IGDB.
 
 ### 2026-07-16 — Claude
 - **Paramètres** : onglet « À VENIR » supprimé (placeholder jamais développé) ;

@@ -35,16 +35,48 @@ function serializeGame(m: { id: string; title: string; posterPath: string | null
 export async function gamesRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth);
 
+  // Recherche jeux : BIBLIOTHÈQUE LOCALE d'abord (même comportement que la
+  // recherche séries/films), puis IGDB, dédupliqué par igdbId. Les jeux déjà
+  // connus renvoient leur id local (`id`) et `inLibrary` pour la coche jaune.
   app.get('/api/games/search', async (request) => {
     const { q } = z.object({ q: z.string().default('') }).parse(request.query ?? {});
     if (q.trim().length < 2) return { results: [] };
-    const games = await igdbSearch(q.trim());
+    const needle = q.trim();
+    const local = await prisma.media.findMany({
+      where: {
+        type: 'game',
+        OR: [
+          { title: { contains: needle } },
+          { originalTitle: { contains: needle } },
+          { localizedTitle: { contains: needle } },
+        ],
+      },
+      include: { statuses: { where: { userId: request.userId } } },
+      take: 10,
+    });
+    const seen = new Set(local.map((m) => m.igdbId).filter(Boolean));
+    const games = await igdbSearch(needle).catch(() => []);
     return {
-      results: games.map((g) => ({
-        igdbId: String(g.id), title: g.name,
-        year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
-        posterPath: g.cover ? igdbImageUrl(g.cover.image_id) : null,
-      })),
+      results: [
+        ...local.map((m) => ({
+          id: m.id,
+          igdbId: m.igdbId,
+          title: m.localizedTitle ?? m.title,
+          year: m.year,
+          posterPath: m.posterPath,
+          inLibrary: m.statuses.length > 0,
+        })),
+        ...games
+          .filter((g) => !seen.has(String(g.id)))
+          .map((g) => ({
+            id: null,
+            igdbId: String(g.id),
+            title: g.name,
+            year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
+            posterPath: g.cover ? igdbImageUrl(g.cover.image_id) : null,
+            inLibrary: false,
+          })),
+      ],
     };
   });
 
