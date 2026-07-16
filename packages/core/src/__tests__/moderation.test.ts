@@ -66,6 +66,19 @@ describe('findBlockedTerm — chaque catégorie, plusieurs langues', () => {
     expect(category('they are subhuman')).toBe('violent_slur');
     expect(category('man sollte sie vergasen')).toBe('violent_slur');
   });
+  it('insultes courantes (curseur politesse, 2026-07-17)', () => {
+    expect(category('espèce de connard')).toBe('insult');
+    expect(category('ta gueule')).toBe('insult');
+    expect(category('ferme ta gueule un peu')).toBe('insult');
+    expect(category('va te faire foutre')).toBe('insult');
+    expect(category('sale enfoiré')).toBe('insult');
+    expect(category('quel trou du cul celui-là')).toBe('insult');
+    expect(category('what an asshole')).toBe('insult');
+    expect(category('stfu dude')).toBe('insult');
+    expect(category('eres un gilipollas')).toBe('insult');
+    expect(category('sei uno stronzo')).toBe('insult');
+    expect(category('halt die fresse')).toBe('insult');
+  });
 });
 
 describe('findBlockedTerm — contournements attrapés', () => {
@@ -120,6 +133,15 @@ describe('findBlockedTerm — NON-régression (aucun faux positif)', () => {
     'Cocoon is an underrated 80s film', // ≠ coon
     'A pakistani cooking show', // ≠ paki
     'Que classe cette réalisation !',
+    // Pièges du curseur « insultes » (2026-07-17) — ne doivent JAMAIS bloquer :
+    'Une espèce de concept très original', // « espècedecon…cept » ≠ espèce de con
+    'La majorité du contenu est excellente', // « du con…tenu » ≠ ducon
+    'Le gagnant du concours est annoncé', // « du con…cours »
+    'Cette gueule d’ange est parfaite pour le rôle', // « gueule » seul OK
+    'Il fait la gueule tout l’épisode', // « la gueule » ≠ ta gueule
+    'Un connaisseur appréciera', // ≠ connard
+    'Le PDF du programme est en ligne', // ≠ pd
+    'Un abricot bien mûr', // contrôle historique
   ];
   for (const text of legitimate) {
     it(`ne bloque pas : « ${text} »`, () => {

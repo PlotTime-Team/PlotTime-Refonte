@@ -35,7 +35,8 @@ export type ModerationCategory =
   | 'homophobia'
   | 'sexism'
   | 'sexual_slur'
-  | 'violent_slur';
+  | 'violent_slur'
+  | 'insult';
 
 export const BLOCKLIST: Record<ModerationCategory, string[]> = {
   // --- Racisme (slurs ethniques/raciaux sans ambiguïté) -------------------
@@ -164,6 +165,47 @@ export const BLOCKLIST: Record<ModerationCategory, string[]> = {
     'figliodiputtana', // « figlio di puttana »
     // pt
     'filhodaputa', // « filho da puta »
+  ],
+
+  // --- Insultes courantes (politesse de l'app, décision 2026-07-17) --------
+  // Curseur resserré à la demande d'Étienne/Benjamin : au-delà de la haine
+  // grave, on bloque les insultes directes non ambiguës. EXCLUS volontairement
+  // (faux positifs garantis, ne pas ajouter) :
+  //   · « espèce de con » → compact « especedecon » matcherait « espèce de
+  //     conCEPT/conCOURS/conCOMBRE » ;
+  //   · « gros con »/« sale con » → « gros conCOURS », « sale conCURRENT » ;
+  //   · « con » seul = ultra-ambigu ; « bâtard » = pain ; « tg » = sigle
+  //     fréquent ; « ntm » = groupe de rap.
+  insult: [
+    // fr
+    'connard',
+    'connards',
+    'ta gueule', // compact « tagueule » — couvre « ferme ta gueule », « ta gueule ! »
+    'va te faire foutre',
+    'va te faire enculer',
+    'enfoire', // « enfoiré »
+    'enfoires',
+    // NB : PAS « ducon » — 5 lettres → sous-chaîne, matcherait « du CONtenu »,
+    // « du CONcours » une fois les espaces compactés.
+    'trou du cul', // compact « trouducul »
+    'fdp', // abréviation « fils de pute » (court → frontière de mot)
+    // en
+    'asshole',
+    'assholes',
+    'dickhead',
+    'shut the fuck up',
+    'stfu',
+    // es
+    'gilipollas',
+    'cabron', // « cabrón » (insulte directe ; pas de mot légitime « cabron »)
+    // de
+    'arschloch',
+    'halt die fresse',
+    // it
+    'stronzo',
+    'vaffanculo',
+    // pt — NB : pas « arrombado » (aussi « cambriolé », légitime)
+    'vai te foder',
   ],
 
   // --- Appels à la violence / déshumanisation -----------------------------
