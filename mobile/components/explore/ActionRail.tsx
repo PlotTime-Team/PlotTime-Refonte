@@ -58,6 +58,7 @@ function RailButton({
 export function ActionRail({
   item,
   state,
+  isGame,
   onLike,
   onDislike,
   onWatched,
@@ -67,6 +68,7 @@ export function ActionRail({
 }: {
   item: FeedItem;
   state: RailState;
+  isGame?: boolean;
   onLike: () => void;
   onDislike: () => void;
   onWatched: () => void;
@@ -92,24 +94,34 @@ export function ActionRail({
           </View>
         )}
       </Pressable>
+      {/* Jeux : le ❤️ pose le statut « Voulu » et la coche « Terminé » (mêmes
+          mots que la fiche jeu) — « À voir »/« Déjà vu » n'avaient pas de sens. */}
       <RailButton
         icon="heart"
         active={state.liked}
         activeColor={COLORS.yellow}
         count={state.likes}
         onPress={onLike}
-        label={state.liked ? 'Retirer de la liste à voir' : 'Ajouter à la liste à voir'}
-        caption="À voir"
+        label={
+          isGame
+            ? state.liked ? 'Retirer des jeux voulus' : 'Ajouter aux jeux voulus'
+            : state.liked ? 'Retirer de la liste à voir' : 'Ajouter à la liste à voir'
+        }
+        caption={isGame ? 'Voulu' : 'À voir'}
         selected={state.liked}
       />
       <RailButton
-        icon="eye"
+        icon={isGame ? 'check-circle' : 'eye'}
         active={state.watched}
         activeColor={COLORS.green}
         count={state.watchedCount}
         onPress={onWatched}
-        label={state.watched ? 'Marquer comme non vu' : 'Marquer comme vu'}
-        caption="Déjà vu"
+        label={
+          isGame
+            ? state.watched ? 'Retirer des jeux terminés' : 'Marquer comme terminé'
+            : state.watched ? 'Marquer comme non vu' : 'Marquer comme vu'
+        }
+        caption={isGame ? 'Terminé' : 'Déjà vu'}
         selected={state.watched}
       />
       <RailButton icon="thumbs-down" activeColor={COLORS.red} onPress={onDislike} label="Pas intéressé, passer" caption="Passer" />

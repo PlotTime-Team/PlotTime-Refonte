@@ -199,7 +199,16 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (tmdbEnabled()) {
-      const remote = await tmdbSearch(q, 'multi', undefined, lang, allowAdult);
+      let remote = await tmdbSearch(q, 'multi', undefined, lang, allowAdult);
+      // Saisie en cours : TMDb ne matche pas un dernier mot PARTIEL
+      // (« assassin's creed ori » → 0). On retente sans lui, l'utilisateur voit
+      // des résultats pendant qu'il tape au lieu d'un écran vide.
+      if (remote.length === 0 && /\s/.test(q)) {
+        const withoutLastWord = q.replace(/\s+\S+$/, '').trim();
+        if (withoutLastWord.length >= 3) {
+          remote = await tmdbSearch(withoutLastWord, 'multi', undefined, lang, allowAdult);
+        }
+      }
       for (const r of remote.slice(0, 20)) {
         // isAdultContent voit le titre LOCALISÉ, le titre ORIGINAL (kanji inclus,
         // désormais détecté) et le résumé. Le filtre par mots-clés ci-dessous

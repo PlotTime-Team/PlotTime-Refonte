@@ -43,10 +43,18 @@ export function TikTokFeed() {
   const dryRef = useRef(0); // nombre de fetchs consécutifs sans nouveauté
   const endBusy = useRef(false); // anti double-déclenchement du tirage de fin
 
+  // Deck FIGÉ tant que l'utilisateur ne demande pas de nouveau tirage
+  // (pull-to-refresh, carte de fin, re-clic sur l'onglet Explorer) : chaque
+  // refetch renvoie un deck ENTIÈREMENT NEUF (mémoire d'impressions côté
+  // serveur) — un refetch silencieux (refocus fenêtre, remontage après 30 min)
+  // ramenait donc l'utilisateur en haut d'un nouveau deck en perdant ses choix.
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['explore', 'feed'],
     queryFn: () => api.get<{ feed: FeedItem[] }>('/api/explore/feed'),
-    staleTime: 30 * 60_000,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // Catégorie JEUX : source séparée (IGDB), pas le feed séries/films.
@@ -55,7 +63,11 @@ export function TikTokFeed() {
     queryKey: ['explore', 'games'],
     queryFn: () => api.get<{ feed: FeedItem[] }>('/api/explore/games'),
     enabled: isGames,
-    staleTime: 30 * 60_000,
+    // Même règle que le feed : deck stable, renouvelé uniquement à la demande.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   const all = useMemo(() => [...(data?.feed ?? []), ...extra], [data?.feed, extra]);

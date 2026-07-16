@@ -86,8 +86,23 @@ export function searchQueryBody(q: string, allowAdult = false): string {
   return `search "${q.replace(/"/g, '')}"; ${FIELDS};${where} limit 30;`;
 }
 
+// Repli PRÉFIXE : le `search` plein-texte IGDB ne matche pas les mots partiels
+// (« assassin's creed ori » → 0 résultat tant que « origins » n'est pas fini).
+// `where name ~ *"…"*` (joker, insensible à la casse) attrape la saisie en cours.
+export function prefixQueryBody(q: string, allowAdult = false): string {
+  const safe = q.replace(/["\\]/g, '');
+  const themes = allowAdult ? '' : ` & ${SAFE_THEMES}`;
+  return `${FIELDS}; where name ~ *"${safe}"*${themes}; sort total_rating_count desc; limit 30;`;
+}
+
 export async function igdbSearch(q: string, allowAdult = false): Promise<IgdbGame[]> {
   const games = ((await igdbQuery<IgdbGame[]>('games', searchQueryBody(q, allowAdult), DAY)) ?? []).filter(isMainGame);
+  // Peu/pas de résultats plein-texte → tentative joker (saisie partielle).
+  if (games.length < 3) {
+    const viaPrefix = ((await igdbQuery<IgdbGame[]>('games', prefixQueryBody(q, allowAdult), DAY)) ?? []).filter(isMainGame);
+    const seen = new Set(games.map((g) => g.id));
+    for (const g of viaPrefix) if (!seen.has(g.id)) games.push(g);
+  }
   return allowAdult ? games : games.filter(isSafeGame);
 }
 
