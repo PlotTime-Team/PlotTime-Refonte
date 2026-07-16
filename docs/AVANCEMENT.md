@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Thèmes : plus de liseré blanc en bas d'écran sur Android (barres système teintées avant le premier rendu sur la web app ; thème de l'appareil débloqué côté natif) + correctif bouton « Retour » après changement de thème
+Dernière mise à jour : **2026-07-16** (Claude) — Bibliothèques du profil : pastille de statut flottante (suit le scroll, comme l'onglet Séries) + barres de progression colorées par statut (jaune en cours, vert à jour, bleu terminé, orange plus tard, rouge arrêté)
 
 ---
 
@@ -72,6 +72,26 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Claude (6)
+- **Bibliothèques du profil (Séries / Films) + onglet Jeux : pastille de
+  statut FLOTTANTE** — « EN COURS », « TERMINÉ »… suit le défilement et change
+  au passage des sections, comme dans l'onglet Séries (réfs TV Time). La
+  mécanique est extraite dans `components/FloatingSection.tsx`
+  (`useFloatingSection` + `FloatingSectionPill`) et l'onglet Séries refactoré
+  dessus. Elle apparaît aussi quand un filtre de progression est actif.
+- **Barres de progression colorées par STATUT** (`STATUS_BAR` dans
+  `lib/theme.ts`, couleurs fixes dans tous les thèmes — codes de statut, pas
+  accents) : jaune « En cours », vert « À jour », **bleu « Terminé »** (barre
+  pleine — TV Time affiche du violet, choix produit : bleu), **orange
+  « Regarder plus tard »**, **rouge « Arrêté »** — la barre montre où on s'est
+  arrêté (épisodes vus / diffusés). Rien pour « Pas commencé ».
+- La bibliothèque Séries gagne une section « Regarder plus tard » dédiée
+  (avant, ces séries étaient mélangées à « Pas commencé »).
+- Vérifié au banc Playwright (16/16) : 5 couleurs et largeurs de barres
+  exactes (pleine / partielle / 2 épisodes sur 4), sections dans l'ordre,
+  pastille flottante en défilement sur Séries + Jeux, pastille en mode filtré,
+  onglet Séries sans régression après refactor. Captures comparées aux réfs.
 
 ### 2026-07-16 — Claude (5)
 - **Correctif : liseré blanc en bas d'écran (barre de gestes Android) avec les

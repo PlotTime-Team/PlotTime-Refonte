@@ -162,6 +162,18 @@ export function applyThemePreference(pref: ThemePreference): boolean {
   return false;
 }
 
+// Couleurs des barres de progression par STATUT de suivi (bibliothèques du
+// profil). FIXES dans tous les thèmes — ce sont des codes de statut, pas des
+// accents (en Sunset, l'accent terracotta serait illisible face à l'orange
+// « Regarder plus tard »). `track` = même teinte à 30 % (portion restante).
+export const STATUS_BAR = {
+  watching: { fill: '#FFD400', track: 'rgba(255,212,0,0.30)' }, // En cours (jaune)
+  upToDate: { fill: '#62D600', track: 'rgba(98,214,0,0.30)' }, // À jour (vert)
+  completed: { fill: '#2F80ED', track: 'rgba(47,128,237,0.30)' }, // Terminé (bleu)
+  watchlist: { fill: '#F7941D', track: 'rgba(247,148,29,0.30)' }, // Regarder plus tard (orange)
+  stopped: { fill: '#E53935', track: 'rgba(229,57,53,0.30)' }, // Arrêté (rouge)
+} as const;
+
 // Rayons calqués sur TV Time (cartes et affiches nettement arrondies).
 export const RADIUS = {
   card: 8,
