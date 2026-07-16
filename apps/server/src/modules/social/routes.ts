@@ -6,7 +6,37 @@ import { mediaTitle, serializeMedia } from '../media/serialize.js';
 import { getUserLang } from '../media/userLang.js';
 import { notifyFollowers, notifyUser } from './notify.js';
 import { BADGES, findBlockedTerm } from '@serietime/core';
-import { scheduleRecompute } from '../gamification/service.js';
+import { meView, scheduleRecompute } from '../gamification/service.js';
+
+// Ordre favoris (drag & drop) partagé avec /api/profile : positionnés d'abord,
+// puis les plus anciennement ajoutés.
+const FAVORITE_ORDER = [
+  { favoriteOrder: { sort: 'asc' as const, nulls: 'last' as const } },
+  { favoritedAt: 'asc' as const },
+];
+
+// Sous-ensemble PUBLIC de la gamification (réputation, visible même sur un
+// profil restreint) : niveau, titre, streak et badges DÉBLOQUÉS uniquement.
+// Les défis (personnels) ne sont jamais exposés. Réutilise meView (lecture
+// pure, aucune écriture ni notification). Null si l'utilisateur a disparu.
+async function publicGamification(userId: string) {
+  const view = await meView(userId);
+  if (!view) return null;
+  const badges = view.badges
+    .filter((b) => b.tier > 0)
+    // Palier décroissant, puis déblocage le plus récent d'abord.
+    .sort((a, b) => b.tier - a.tier || (b.unlockedAt ?? '').localeCompare(a.unlockedAt ?? ''))
+    .map((b) => ({ id: b.id, label: b.label, icon: b.icon, tier: b.tier, tierCount: b.tierCount }));
+  return {
+    level: view.level,
+    levelTitle: view.levelTitle,
+    xp: view.xp,
+    nextLevelXp: view.nextLevelXp,
+    currentStreak: view.currentStreak,
+    bestStreak: view.bestStreak,
+    badges,
+  };
+}
 
 type PublicUser = { id: string; displayName: string; avatarUrl: string | null; isPrivate: boolean };
 
@@ -139,32 +169,66 @@ export async function socialRoutes(app: FastifyInstance): Promise<void> {
       !!(await prisma.follow.findUnique({
         where: { followerId_followingId: { followerId: request.userId, followingId: id } },
       }));
-    const [followersCount, followingCount] = await Promise.all([
+    // Gamification calculée TOUJOURS (réputation publique, même en restricted).
+    const [followersCount, followingCount, gamification] = await Promise.all([
       prisma.follow.count({ where: { followingId: id } }),
       prisma.follow.count({ where: { followerId: id } }),
+      publicGamification(id),
     ]);
-    const base = { ...publicUser(user), isFollowing, isSelf, followersCount, followingCount };
+    const base = { ...publicUser(user), isFollowing, isSelf, followersCount, followingCount, gamification };
 
-    // Profil privé : activité masquée aux non-abonnés.
+    // Profil privé : niveau + trophées restent visibles, mais l'activité (stats,
+    // séries récentes, favoris) est masquée aux non-abonnés.
     if (user.isPrivate && !isSelf && !isFollowing) {
-      return { ...base, restricted: true, stats: null, recentShows: [] };
+      return {
+        ...base,
+        restricted: true,
+        stats: null,
+        recentShows: [],
+        favoriteShows: [],
+        favoriteMovies: [],
+        favoriteGames: [],
+      };
     }
-    const [showsCount, moviesCount, episodesWatched, recent] = await Promise.all([
-      prisma.userMediaStatus.count({ where: { userId: id, media: { type: 'show' } } }),
-      prisma.userMediaStatus.count({ where: { userId: id, media: { type: 'movie' } } }),
-      prisma.userEpisodeStatus.count({ where: { userId: id, status: 'watched' } }),
-      prisma.userMediaStatus.findMany({
-        where: { userId: id, media: { type: 'show' }, isHidden: false },
-        include: { media: true },
-        orderBy: { lastWatchedAt: 'desc' },
-        take: 12,
-      }),
-    ]);
+    const [showsCount, moviesCount, episodesWatched, gamesCount, recent, favoriteShows, favoriteMovies, favoriteGames] =
+      await Promise.all([
+        prisma.userMediaStatus.count({ where: { userId: id, media: { type: 'show' } } }),
+        prisma.userMediaStatus.count({ where: { userId: id, media: { type: 'movie' } } }),
+        prisma.userEpisodeStatus.count({ where: { userId: id, status: 'watched' } }),
+        prisma.userMediaStatus.count({ where: { userId: id, media: { type: 'game' }, isHidden: false } }),
+        prisma.userMediaStatus.findMany({
+          where: { userId: id, media: { type: 'show' }, isHidden: false },
+          include: { media: true },
+          orderBy: { lastWatchedAt: 'desc' },
+          take: 12,
+        }),
+        prisma.userMediaStatus.findMany({
+          where: { userId: id, media: { type: 'show' }, isFavorite: true },
+          include: { media: true },
+          orderBy: FAVORITE_ORDER,
+          take: 12,
+        }),
+        prisma.userMediaStatus.findMany({
+          where: { userId: id, media: { type: 'movie' }, isFavorite: true },
+          include: { media: true },
+          orderBy: FAVORITE_ORDER,
+          take: 12,
+        }),
+        prisma.userMediaStatus.findMany({
+          where: { userId: id, media: { type: 'game' }, isFavorite: true },
+          include: { media: true },
+          orderBy: FAVORITE_ORDER,
+          take: 12,
+        }),
+      ]);
     return {
       ...base,
       restricted: false,
-      stats: { showsCount, moviesCount, episodesWatched },
+      stats: { showsCount, moviesCount, episodesWatched, gamesCount },
       recentShows: recent.map((s) => serializeMedia(s.media, s, lang)),
+      favoriteShows: favoriteShows.map((s) => serializeMedia(s.media, s, lang)),
+      favoriteMovies: favoriteMovies.map((s) => serializeMedia(s.media, s, lang)),
+      favoriteGames: favoriteGames.map((s) => serializeMedia(s.media, s, lang)),
     };
   });
 

@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Interrupteur « Contenu 18+ » + filtre hentai renforcé (Claude) et lot jeux/profil/thème d'Étienne (populaires 18 mois, à venir par hypes, séries sans flash, stats profil en SQL)
+Dernière mise à jour : **2026-07-16** (Claude) — Profil public enrichi (niveau + titre + streak, section Trophées, compteur Jeux, favoris séries/films/jeux ; gamification visible même en profil privé)
 
 ---
 
@@ -19,7 +19,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 - **Branche de référence : `main`** (à cloner / puller). Le développement passe
   par des branches courtes fusionnées via pull request.
-- Tests : `pnpm test` (285 tests au 2026-07-16 : 143 core + 142 serveur).
+- Tests : `pnpm test` (286 tests au 2026-07-16 : 143 core + 143 serveur).
 - Lancement local : voir `README.md` (serveur `pnpm dev:server`, mobile `npx expo start -c`).
 
 ## État par domaine
@@ -37,7 +37,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Recherche (design TV Time) | ✅ Fait | Onglets SÉRIES ET FILMS / JEUX / UTILISATEURS, « Annuler », `+` jaunes, debounce |
 | Social : abonnements, fil d'activité | ✅ Fait | Follow/unfollow, fil des visionnages/commentaires des personnes suivies |
 | Social : commentaires, réponses, réactions | ✅ Fait | Fils de discussion, réactions multi-emoji (❤️👍😂😮😢) |
-| Profil public + confidentialité | ✅ Fait | Écran `/user/[id]`, profils privés masqués aux non-abonnés |
+| Profil public + confidentialité | ✅ Fait | Écran `/user/[id]` : pastille niveau + titre + streak, section Trophées (badges débloqués), compteurs Séries/Films/Épisodes/Jeux, favoris séries/films/jeux, séries récentes. Gamification (réputation) visible même sur un profil privé ; stats/récents/favoris masqués aux non-abonnés |
 | Notifications in-app | ✅ Fait | Cloche + badge ; ami qui commente/favorise, réponse ou réaction à un commentaire |
 | Notifications push (OS) | ⏸ Non commencé | Nécessite dev build Expo + tokens Expo Push (la génération d'événements existe déjà) |
 | Import ZIP TV Time | ✅ Fait (v. initiale) | Analyse, matching, résolution manuelle, application |
@@ -77,6 +77,37 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Profil public enrichi : niveau, trophées, streak et favoris
+Le profil public d'un utilisateur (`/user/[id]`) ne montrait que 3 compteurs et
+une rangée de séries récentes. Il expose désormais la **gamification** (niveau,
+titre, streak, badges débloqués) et les **goûts** (favoris séries/films/jeux),
+pour valoriser la réputation et coller à ce qu'on voit sur son propre profil.
+- **Serveur (`GET /api/users/:id`, `modules/social/routes.ts`)** : réutilise
+  `meView(id)` (lecture pure, aucune écriture/notification) via un helper
+  `publicGamification(id)` qui renvoie un sous-ensemble PUBLIC
+  `{ level, levelTitle, xp, nextLevelXp, currentStreak, bestStreak, badges }` où
+  `badges` = **uniquement les paliers débloqués** (`tier > 0`), triés par palier
+  décroissant puis déblocage récent, chacun `{ id, label, icon, tier, tierCount }`
+  (les **défis restent privés**, jamais exposés). Ajout des `favoriteShows`/
+  `favoriteMovies`/`favoriteGames` (12 max, `isFavorite`, `serializeMedia`, langue
+  du visiteur) et du `gamesCount` aux stats. `meView` + les favoris sont en
+  `Promise.all` avec les requêtes existantes (pas de N+1).
+- **Confidentialité** : la **gamification reste visible même en `restricted`**
+  (niveau + trophées = réputation), tandis que stats détaillées, séries récentes
+  et favoris restent masqués (`favoriteShows: []`, etc.).
+- **Mobile (`mobile/app/user/[id].tsx`)** : pastille de niveau jaune sur l'avatar
+  + titre (« Niveau 52 · Sérievore ») et petite ligne streak (« 🔥 12 jours »)
+  sous le nom ; section **Trophées** (rangée horizontale de pastilles colorées par
+  palier via `TIER_COLORS`, icône Feather avec fallback `award`, label), visible
+  même sur un profil privé ; compteur **Jeux** ajouté (Séries/Films/Épisodes/Jeux) ;
+  sections **Séries/Films/Jeux préférés** en rangées d'affiches (tap → `/show/:id`,
+  `/show/:id?type=movie`, `/game/:id`), masquées si vides ; rangée « séries
+  récentes » conservée.
+- **Tests** : nouveau cas serveur dans `social.test.ts` (profil public expose
+  `gamification.level` + `favoriteMovies`, `challenges` absent ; profil privé
+  non-suivi masque les favoris mais garde la gamification). `pnpm --filter
+  @serietime/server typecheck` + `test` verts (143 serveur), `mobile` typecheck 0 erreur.
 
 ### 2026-07-16 — Interrupteur « contenu 18+ » par utilisateur + détection hentai renforcée
 Ajout d'un réglage **par compte** pour afficher (ou non) le contenu
