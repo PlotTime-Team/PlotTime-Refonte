@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-16** (Claude) — Fiches série/film à l'échelle harmonisée (titres 16, corps 13,5) + barre de gestes Android enfin assortie au thème en PWA (metas theme-color à variantes `media` + `color-scheme`)
+Dernière mise à jour : **2026-07-16** (Claude) — Rose du logo en accent secondaire (pastilles de section, points de notification, compteurs « +N ») : interfaces moins monochromes, surtout en sombre
 
 ---
 
@@ -72,6 +72,20 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-16 — Claude (10)
+- **Rose du logo en accent SECONDAIRE de marque** (demande produit : casser le
+  monochrome, surtout en thème sombre, avec le rose + le jaune du logo).
+  Nouveau rôle `pink`/`onPink` dans les trois palettes (clair `#E8317F`,
+  sombre éclairci `#FF4D97`, Sunset réchauffé `#D8447F`).
+- Appliqué : **pastilles de section** (À voir, Historique, Pas commencé… de
+  l'onglet Séries ; En cours/Terminé… des bibliothèques ; VOULUS/POPULAIRES…
+  des Jeux ; pastille flottante), **points de notification** (onglet Explorer,
+  cloche du profil), **compteurs « +N »** des cartes À voir (au lieu du gris —
+  le jaune y serait illisible sur fond clair). Le jaune de marque reste le
+  premier accent (FILTRES, FAB, onglet actif, barres En cours).
+- Captures vérifiées au banc en sombre ET en clair : pastilles roses lisibles,
+  duo rose/jaune cohérent, aucun autre élément altéré.
 
 ### 2026-07-16 — Claude (9)
 - **Fiches série ET film : sections à l'échelle harmonisée** (les cotes lues

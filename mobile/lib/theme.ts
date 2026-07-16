@@ -48,6 +48,10 @@ const LIGHT = {
   provider: '#00A8E1',
   // Texte/icônes posés sur l'accent (boutons jaunes/terracotta, FAB, badges).
   onAccent: '#000000',
+  // Rose du logo (accent SECONDAIRE de marque) : pastilles de section, points
+  // de notification, compteurs — casse le monochrome, surtout en sombre.
+  pink: '#E8317F',
+  onPink: '#FFFFFF',
   // Vignettes/affiches en attente d'image.
   imagePlaceholder: '#E5E5E5',
 };
@@ -79,6 +83,9 @@ const DARK: Palette = {
   overlay: 'rgba(0,0,0,0.72)',
   provider: '#00A8E1',
   onAccent: '#101014',
+  // Rose éclairci pour rester vif sur les surfaces charbon.
+  pink: '#FF4D97',
+  onPink: '#FFFFFF',
   imagePlaceholder: '#2A2A32',
 };
 
@@ -107,6 +114,9 @@ const SUNSET: Palette = {
   overlay: 'rgba(61,41,25,0.55)',
   provider: '#C96F45',
   onAccent: '#FFF9F2',
+  // Rose réchauffé pour s'accorder aux crèmes Sunset.
+  pink: '#D8447F',
+  onPink: '#FFF9F2',
   imagePlaceholder: '#E7DBCB',
 };
 

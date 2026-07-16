@@ -126,8 +126,9 @@ const styles = StyleSheet.create({
   headerSide: { width: 46, justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontFamily: FONTS.bold, color: COLORS.black },
   pillWrap: { alignItems: 'center', paddingVertical: 12 },
+  // Rose du logo, comme les pastilles de l'onglet Séries (cohérence).
   pill: {
-    backgroundColor: COLORS.pillGrey, color: COLORS.white, borderRadius: 999,
+    backgroundColor: COLORS.pink, color: COLORS.onPink, borderRadius: 999,
     paddingHorizontal: 14, paddingVertical: 4, fontSize: 11, fontFamily: FONTS.bold,
     letterSpacing: 0.8, textTransform: 'uppercase', overflow: 'hidden',
   },
