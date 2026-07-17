@@ -20,6 +20,7 @@ import { peopleRoutes } from './modules/people/routes.js';
 import { gamesRoutes } from './modules/games/routes.js';
 import { gamificationRoutes } from './modules/gamification/routes.js';
 import { reportsRoutes } from './modules/reports/routes.js';
+import { legalRoutes } from './modules/legal/routes.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -87,6 +88,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(gamesRoutes);
   await app.register(gamificationRoutes);
   await app.register(reportsRoutes);
+  await app.register(legalRoutes);
 
   return app;
 }

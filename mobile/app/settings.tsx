@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Modal, TextInput, ActivityIndicator, Animated, Easing, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Modal, TextInput, ActivityIndicator, Animated, Easing, Platform, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,16 @@ import { useReduceMotion } from '@/lib/useReduceMotion';
 import { ssoWebAvailable, initGoogleButton, discordLogin } from '@/lib/sso';
 
 const NATIVE = Platform.OS !== 'web';
+
+// Pages légales servies par le serveur (publiques, exigées par les stores).
+const LEGAL_BASE = 'https://serietime.studio-vives.fr/legal';
+
+// Ouvre une URL externe : nouvel onglet sur web (ne pas quitter la SPA),
+// navigateur système sur natif (même pattern que le lien X de person.tsx).
+function openExternal(url: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(url, '_blank', 'noopener');
+  else Linking.openURL(url).catch(() => undefined);
+}
 
 const TABS = ['COMPTE', 'APPLICATION'];
 
@@ -590,6 +600,19 @@ function AppTab() {
           <Text style={styles.cacheText}>VIDER LE CACHE</Text>
         </Pressable>
       </View>
+      <Divider />
+      {/* À propos : liens légaux (exigés par Apple/Google) + attributions des
+          sources de données (mentions obligatoires TMDb/TheTVDB/IGDB — cf.
+          docs/STORES.md A2/A3). */}
+      <SectionTitle>À propos</SectionTitle>
+      <Row label="Politique de confidentialité" onPress={() => openExternal(`${LEGAL_BASE}/privacy`)} />
+      <Row label="Conditions d'utilisation" onPress={() => openExternal(`${LEGAL_BASE}/terms`)} />
+      <View style={{ paddingHorizontal: 24, paddingTop: 10 }}>
+        <Text style={styles.attribution}>Les informations sur les œuvres proviennent de :</Text>
+        <Text style={styles.attribution}>This product uses the TMDB API but is not endorsed or certified by TMDB.</Text>
+        <Text style={styles.attribution}>Metadata provided by TheTVDB. Please consider adding missing information or subscribing.</Text>
+        <Text style={styles.attribution}>Game data provided by IGDB.com.</Text>
+      </View>
       <Text style={styles.version}>VERSION 1.0.0</Text>
     </View>
   );
@@ -707,4 +730,5 @@ const styles = StyleSheet.create({
   warn: { fontSize: 15, fontFamily: FONTS.regular, color: COLORS.textMuted, lineHeight: 21, marginBottom: 8 },
   version: { textAlign: 'center', paddingVertical: 24, fontSize: 13, fontFamily: FONTS.bold, color: COLORS.textMuted, letterSpacing: 1 },
   themeNote: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.textMuted, paddingHorizontal: 24, paddingTop: 4, lineHeight: 18 },
+  attribution: { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.textMuted, lineHeight: 17, marginBottom: 6 },
 });

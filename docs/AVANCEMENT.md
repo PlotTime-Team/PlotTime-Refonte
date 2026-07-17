@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-17** (Claude) — Icône maskable aérée (fond bleu visible comme au multitâche), fiches série/film fluides au défilement (en-tête en surimpression), correctif racine du flash de l'historique sur l'onglet Séries
+Dernière mise à jour : **2026-07-17** (Claude) — Pages légales publiques `/legal/*` (privacy, CGU + règles de communauté, suppression de compte) + section « À propos » avec attributions TMDb/TheTVDB/IGDB dans les Paramètres (conformité stores A2/A3/A5)
 
 ---
 
@@ -19,7 +19,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 - **Branche de référence : `main`** (à cloner / puller). Le développement passe
   par des branches courtes fusionnées via pull request.
-- Tests : `pnpm test` (310 tests au 2026-07-17 : 158 core + 152 serveur).
+- Tests : `pnpm test` (313 tests au 2026-07-17 : 158 core + 155 serveur).
 - Lancement local : voir `README.md` (serveur `pnpm dev:server`, mobile `npx expo start -c`).
 
 ## État par domaine
@@ -60,6 +60,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Modération — suggestions (contenu adulte / porno) | ✅ Fait | Détection **porno ciblée** (sans bloquer la violence 18+) : module pur `packages/core/src/moderation/adultContent.ts` (`containsAdultContent` + `ADULT_MARKERS` multilingues fr/en/es/de/it/pt + japonais romanisé, tolérant leet/répétitions/séparateurs). TMDb : `include_adult=false` + `adult === true` + `containsAdultContent(titre/résumé)` sur flux/recherche/recos, **et** `without_keywords` (ids mots-clés porno via `/search/keyword`, désormais **nom exact** — plus de sur-blocage sentai/senpai/porco) sur `/discover`ᐧ **Hentai** détecté par item via `tmdbKeywordNames` (mot-clé `erotic`, animés uniquement) + mot-clé `erotic` ajouté au `without_keywords` des viviers animés. IGDB : thème « Erotic » (id 42) + `containsAdultContent(name, summary)` dans `isSafeGame` (testé) |
 | Contenu 18+ — interrupteur par utilisateur | ✅ Fait | Paramètres > Suggestions > « Contenu 18+ » (défaut **désactivé**) : `allowAdultContent` (`UserSetting`, helper caché `modules/settings/adultContent.ts`). Activé = débraye tout le filtrage adulte pour ce compte (`include_adult=true`, pas de `without_keywords`, pas de `containsAdultContent`, pas de thème IGDB 42, pas de vérif mots-clés) sur `/api/explore/feed`, `/explore/discover`, `/api/search`, `/api/explore/games` ; `include_adult`/clause IGDB font partie de la **clé de cache** → aucune contamination entre comptes (testé). Bibliothèque jamais filtrée |
 | Signalement d'œuvre inappropriée | ✅ Fait | Modèle `Report` (migration `reports`) + module `apps/server/src/modules/reports/routes.ts` (`POST /api/report`, anti-doublon par œuvre/statut pending). Action « Signaler » (icône `flag`) dans le menu ⋯ des fiches série/film (`show/[id].tsx`) et jeu (`game/[id].tsx`) → `ReportModal` de confirmation partagé, `reason: 'adult'`, toast neutre. Tri manuel ultérieur (pas d'écran admin) |
+| Pages légales + attributions (conformité stores) | ✅ Fait | Module public `apps/server/src/modules/legal/routes.ts` (sans `requireAuth`) : `GET /legal/privacy` (politique de confidentialité RGPD), `GET /legal/terms` (CGU + règles de communauté UGC exigées par Apple), `GET /legal/delete-account` (page web de suppression exigée par Google Data Safety) — HTML statique sobre, pied « non affilié à TV Time ni à Whip Media » (testé). Mobile : section « À propos » dans Paramètres > Application (liens privacy/CGU + attributions obligatoires TMDb/TheTVDB/IGDB) |
 | Langue de contenu par utilisateur | ✅ Fait | Paramètres > Langue (fr/en/es/de/it/pt) : titres/résumés des séries et films traduits partout (À voir, À venir, bibliothèque, profil, fiches, recherche, explorer, fil social, listes) via TMDb `/translations` (`Media.translationsJson`, une requête par média, backfill en fond au changement de langue) ; jeux IGDB hors périmètre (nom international) |
 
 ## Prochaines étapes (par priorité)
@@ -79,6 +80,31 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-17 — Claude : pages légales publiques + attributions dans l'app (stores A2/A3/A5)
+- **Serveur — nouveau module `apps/server/src/modules/legal/routes.ts`** (enregistré
+  dans `app.ts`, **sans** hook `requireAuth` → routes publiques) : trois pages HTML
+  statiques (template string, fond blanc, 720 px max, lisibles mobile, pied de page
+  « PlotTime — service indépendant, non affilié à TV Time ni à Whip Media ») :
+  - `GET /legal/privacy` — politique de confidentialité RGPD complète (données
+    collectées, base légale = exécution du service, durées, droits
+    accès/rectification/effacement/portabilité, hébergement France/UE, aucun
+    cookie tiers, pas de pub/tracking/vente de données) ;
+  - `GET /legal/terms` — CGU avec section **Règles de communauté** (pas de
+    haine/harcèlement/contenu sexuel, modération automatique + signalements,
+    suppression de contenus/comptes en cas d'abus — exigence Apple UGC) ;
+  - `GET /legal/delete-account` — marche à suivre de suppression in-app
+    (Paramètres → Supprimer le compte, immédiate et définitive) — exigence
+    Google Data Safety (URL web à déclarer).
+- **Mobile — `mobile/app/settings.tsx`** : section « À propos » en bas de
+  l'onglet APPLICATION — rangées « Politique de confidentialité » et
+  « Conditions d'utilisation » (ouvrent les pages `/legal/*` : `window.open`
+  sur web, `Linking.openURL` sur natif) + bloc discret « Sources de données »
+  avec les trois attributions obligatoires (TMDb texte exact anglais, TheTVDB,
+  IGDB).
+- **Tests** : `apps/server/src/__tests__/legal.test.ts` — 3 tests (200 + HTML +
+  marqueurs clés, sans token). Suite serveur : **155 tests verts** ; typecheck
+  serveur et mobile OK.
 
 ### 2026-07-17 — Doc de publication stores : conformité + mode opératoire
 - **`docs/STORES.md`** : audit de conformité Play Store / App Store sur le code
