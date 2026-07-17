@@ -7,7 +7,9 @@ import { useAppStore } from '@/lib/store';
 import { CONFIGURED_SERVER_URL } from '@/lib/config';
 import { COLORS, FONTS } from '@/lib/theme';
 import { SsoButtons } from '@/components/SsoButtons';
+import { NativeSsoButtons } from '@/components/NativeSsoButtons';
 import { ssoWebAvailable } from '@/lib/sso';
+import { ssoNativeAvailable } from '@/lib/ssoNative';
 
 type Step = 'server' | 'auth';
 type Mode = 'login' | 'register';
@@ -33,6 +35,11 @@ export default function Setup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Builds natifs : vrai dès qu'au moins un provider SSO natif est configuré
+  // côté serveur (Apple/Google/Discord — voir NativeSsoButtons). Tant que les
+  // credentials n'existent pas, l'écran garde le formulaire e-mail (secours dev).
+  const [nativeSsoReady, setNativeSsoReady] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -92,13 +99,22 @@ export default function Setup() {
     }
   };
 
-  // Connexion / inscription via SSO (Google, Facebook) : un jeton du fournisseur
-  // suffit — le serveur crée le compte ou retrouve/lie un compte existant.
-  const oauth = async (provider: 'google' | 'facebook' | 'discord', token: string) => {
+  // Connexion / inscription via SSO : un jeton du fournisseur suffit — le
+  // serveur crée le compte ou retrouve/lie un compte existant. displayName
+  // (Apple uniquement, fourni au premier login) ne sert qu'à la création.
+  const oauth = async (
+    provider: 'google' | 'facebook' | 'discord' | 'apple',
+    token: string,
+    displayName?: string | null,
+  ) => {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.post<{ token: string; user: any }>('/api/auth/oauth', { provider, token });
+      const res = await api.post<{ token: string; user: any }>('/api/auth/oauth', {
+        provider,
+        token,
+        ...(displayName ? { displayName } : {}),
+      });
       setAuth(res.token, res.user);
       router.replace('/(tabs)');
     } catch {
@@ -162,23 +178,30 @@ export default function Setup() {
             {mode === 'register' ? 'Créez votre compte.' : 'Connectez-vous.'}
           </Text>
 
-          {/* Inscription (web) : Google / Discord UNIQUEMENT — aucun mot de passe
-              à créer ni à perdre. Les comptes e-mail existants gardent la
-              connexion classique (onglet « Se connecter »). Sur natif (Expo Go),
-              le SSO est web-only : on garde le formulaire e-mail en secours. */}
-          {mode === 'register' && ssoWebAvailable() ? (
+          {/* Inscription : SSO UNIQUEMENT — aucun mot de passe à créer ni à
+              perdre. Web : Google / Discord (SDK officiels, SsoButtons).
+              Natif : Apple / Google / Discord (NativeSsoButtons) dès que le
+              serveur expose la config ; sinon (dev sans credentials), le
+              formulaire e-mail reste en secours. Les comptes e-mail existants
+              gardent la connexion classique (onglet « Se connecter »). */}
+          {mode === 'register' && (ssoWebAvailable() || nativeSsoReady) ? (
             <>
               <Text style={styles.ssoNote}>
-                Inscris-toi en un clic avec Google ou Discord — pas de mot de passe à retenir,
+                Inscris-toi en un clic — pas de mot de passe à retenir,
                 et tu récupères ton compte à tout moment.
               </Text>
-              <SsoButtons onToken={oauth} separator={null} />
+              {ssoWebAvailable() ? (
+                <SsoButtons onToken={oauth} separator={null} />
+              ) : (
+                <NativeSsoButtons onToken={oauth} onAvailability={setNativeSsoReady} separator={null} />
+              )}
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <Pressable
                 onPress={() => {
                   setMode('login');
                   setError(null);
                 }}
+                accessibilityRole="button"
               >
                 <Text style={styles.link}>J’ai déjà un compte — Se connecter</Text>
               </Pressable>
@@ -245,8 +268,15 @@ export default function Setup() {
                 </Text>
               </Pressable>
 
-              {/* SSO (web app) : Google / Discord. Masqué s'ils ne sont pas configurés. */}
-              <SsoButtons onToken={oauth} separator="ou" />
+              {/* SSO : Google / Discord (web) ou Apple / Google / Discord
+                  (natif). Masqué si rien n'est configuré côté serveur. Monté
+                  aussi en mode inscription : c'est lui qui détecte la config
+                  native et fait basculer l'écran en « SSO uniquement ». */}
+              {ssoNativeAvailable() ? (
+                <NativeSsoButtons onToken={oauth} onAvailability={setNativeSsoReady} separator="ou" />
+              ) : (
+                <SsoButtons onToken={oauth} separator="ou" />
+              )}
             </>
           )}
 

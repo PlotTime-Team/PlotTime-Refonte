@@ -18,6 +18,15 @@ const envSchema = z.object({
   // SSO — audiences Google acceptées (Client IDs Web/Android/iOS, séparés par des virgules)
   // et identifiants de l'app Facebook Login. Laisser vide désactive le provider concerné.
   GOOGLE_CLIENT_IDS: z.string().default(''),
+  // SSO natif (builds App Store / Play Store) — client IDs Google dédiés
+  // iOS/Android, exposés au mobile via GET /api/auth/providers. Penser à les
+  // ajouter AUSSI à GOOGLE_CLIENT_IDS (contrôle d'audience du jeton).
+  GOOGLE_IOS_CLIENT_ID: z.string().default(''),
+  GOOGLE_ANDROID_CLIENT_ID: z.string().default(''),
+  // Sign in with Apple : audience attendue du jeton (= bundle id iOS de l'app).
+  // Vider la variable désactive le provider. À confirmer une fois le compte
+  // Apple Developer créé.
+  APPLE_BUNDLE_ID: z.string().default('com.plottime.app'),
   FACEBOOK_APP_ID: z.string().default(''),
   FACEBOOK_APP_SECRET: z.string().default(''),
   DISCORD_CLIENT_ID: z.string().default(''),

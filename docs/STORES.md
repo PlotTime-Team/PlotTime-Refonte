@@ -33,6 +33,40 @@ compte.** À faire :
   `appleId` déjà en base, vérif à écrire dans `auth/routes.ts`).
 - Estimation : le plus gros chantier restant (2-3 jours avec tests).
 
+#### A1 — état d'avancement (2026-07-17)
+
+**Codé et testé** (tout est config-gated : sans credentials, l'app garde le
+formulaire e-mail et rien ne change en prod) :
+- Serveur : `provider: 'apple'` sur `POST /api/auth/oauth` + `/link` —
+  vérification complète de l'identityToken (JWKS Apple en cache 24 h, signature
+  RS256 via `node:crypto`, claims `iss`/`exp`/`aud === APPLE_BUNDLE_ID`),
+  champ optionnel `displayName` (utilisé à la création du compte uniquement).
+  9 tests dédiés (`apple-auth.test.ts`, JWKS mocké + vraie crypto RSA).
+- Serveur : `GET /api/auth/providers` expose `apple`, `googleIosClientId`,
+  `googleAndroidClientId` (nouvelles vars env `APPLE_BUNDLE_ID` — défaut
+  `com.plottime.app` —, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`).
+- Mobile : `lib/ssoNative.ts` + `components/NativeSsoButtons.tsx` — bouton
+  Apple officiel (iOS), Google via expo-auth-session (idToken), Discord en
+  code + PKCE sans secret (redirect `serietime://oauth/discord`) ; branchés
+  dans `app/setup.tsx` (inscription ET connexion). Packages expo-auth-session /
+  expo-crypto / expo-apple-authentication / expo-web-browser installés,
+  `app.json` prêt (plugin + `usesAppleSignIn`).
+
+**En attente de credentials** (à faire au moment des comptes B0) :
+1. **Google** : créer les client IDs **Android** (empreinte SHA-1 du keystore
+   EAS + package `com.plottime.app`) et **iOS** (bundle `com.plottime.app`)
+   dans la console Google Cloud, puis les poser dans `GOOGLE_IOS_CLIENT_ID` /
+   `GOOGLE_ANDROID_CLIENT_ID` **et les ajouter à `GOOGLE_CLIENT_IDS`**
+   (contrôle d'audience du jeton côté serveur).
+2. **Discord** : déclarer le redirect natif `serietime://oauth/discord` dans
+   le portail développeur Discord (OAuth2 → Redirects) — même app que le web,
+   aucun secret nécessaire (PKCE).
+3. **Apple** : une fois le compte Apple Developer actif, activer la capability
+   « Sign in with Apple » pour `com.plottime.app` et confirmer/poser
+   `APPLE_BUNDLE_ID` côté serveur (vider la variable désactive le bouton).
+4. **Vérifier sur dev build EAS** (pas possible en Expo Go/web) : les trois
+   flux de bout en bout, puis TestFlight.
+
 ### 🔴 A2. Politique de confidentialité — obligatoire avant soumission
 Aucune page n'existe. Les deux stores exigent une **URL publique** ; Apple exige
 aussi le lien dans l'app. À faire : page web (peut être servie par le serveur,

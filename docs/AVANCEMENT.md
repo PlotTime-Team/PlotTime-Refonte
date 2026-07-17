@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-17** (Claude) — Signalement de commentaires + blocage d'utilisateurs (exigences stores UGC, Apple 1.2 / docs/STORES.md A4)
+Dernière mise à jour : **2026-07-17** (Claude) — Auth NATIVE pour les builds stores (STORES.md A1) : Sign in with Apple côté serveur + boutons natifs Apple/Google/Discord (config-gated, en attente des credentials)
 
 ---
 
@@ -28,6 +28,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 |---|---|---|
 | Authentification multi-comptes (e-mail + mot de passe) | ✅ Fait | Inscription/connexion, sessions 30 j, données isolées par compte (testé) ; mot de passe oublié → réinitialisation par ré-auth SSO Google/Discord (testé) |
 | SSO Google / Facebook | ⏸ Préparé, désactivé | Prêt côté serveur (`/api/auth/oauth`) ; nécessite ids OAuth + dev build Expo |
+| Auth native stores (Apple / Google / Discord) | ⏸ Codé, en attente credentials | Serveur : vérif Sign in with Apple (JWT RS256, testée) + `/providers` enrichi. Mobile : `NativeSsoButtons` (bouton Apple officiel, Google expo-auth-session, Discord PKCE), config-gated — s'active dès que les vars env seront posées (voir STORES.md « A1 — état d'avancement ») |
 | Migration douce e-mail → SSO (popup) | ✅ Fait | `mobile/components/LinkAccountPrompt.tsx` : popup dismissible (web uniquement, SSO web-only) proposant de lier Google/Discord aux comptes connectés qui n'ont ni l'un ni l'autre ; montée dans `(tabs)/_layout.tsx` |
 | Contenu séries via TheTVDB | ✅ Fait | Recherche, fiche, saisons/épisodes, titres/synopsis FR, artworks ; clé dans `apps/server/.env` |
 | Contenu films / tendances via TMDb | ✅ Fait | Clé TMDb (compte Benjamin) configurée sur le serveur de prod ; flux Explorer et images films actifs |
@@ -81,6 +82,42 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-17 — Claude : auth NATIVE builds stores — Apple / Google / Discord (STORES.md A1)
+- **Serveur — Sign in with Apple (`modules/auth/routes.ts`)** : `POST
+  /api/auth/oauth` (et `/link`) accepte `provider: 'apple'` avec l'identityToken
+  JWT d'Apple. Vérification **sans nouvelle dépendance** : JWKS
+  `https://appleid.apple.com/auth/keys` (fetch, cache mémoire 24 h, re-fetch si
+  `kid` inconnu → rotation), signature RS256 via `node:crypto`
+  (`createPublicKey` JWK + `verify`), claims `iss`/`exp`/`aud ===
+  APPLE_BUNDLE_ID`. Champ optionnel `displayName` dans `/oauth` (Apple n'envoie
+  le nom qu'au client, premier login) — utilisé uniquement à la création.
+- **Serveur — env + `/providers`** : nouvelles vars `APPLE_BUNDLE_ID` (défaut
+  `com.plottime.app`, vider = désactivé), `GOOGLE_IOS_CLIENT_ID`,
+  `GOOGLE_ANDROID_CLIENT_ID` (défaut vide). `GET /api/auth/providers` expose
+  `apple: true/false`, `googleIosClientId`, `googleAndroidClientId`.
+- **Mobile — `lib/ssoNative.ts`** : `nativeDiscordLogin` (expo-auth-session,
+  code + PKCE **sans secret**, redirect `serietime://oauth/discord`),
+  `nativeAppleLogin` (expo-apple-authentication chargé dynamiquement, iOS
+  seulement) ; `components/NativeSsoButtons.tsx` : bouton **Apple officiel
+  noir** (guideline 4.8) + « Continuer avec Google » (expo-auth-session
+  provider, idToken) + « Continuer avec Discord », chacun affiché **uniquement
+  si le serveur expose sa config**. `app/setup.tsx` : sur natif, l'inscription
+  bascule en « SSO uniquement » dès qu'un provider natif est dispo (sinon
+  formulaire e-mail conservé — secours dev) ; le login propose e-mail + SSO.
+- **Packages mobile** : `expo-auth-session`, `expo-crypto`,
+  `expo-apple-authentication`, `expo-web-browser` (versions SDK 54) ;
+  `app.json` : plugin `expo-apple-authentication` + `ios.usesAppleSignIn`.
+- **En attente de credentials** (tout est config-gated, rien ne change tant
+  que les vars ne sont pas posées) : client IDs Google iOS/Android (à créer et
+  à ajouter AUSSI à `GOOGLE_CLIENT_IDS`), redirect natif à déclarer dans l'app
+  Discord, `APPLE_BUNDLE_ID` à confirmer avec le compte Apple Developer.
+  Détail : `docs/STORES.md` § « A1 — état d'avancement ».
+- **Tests** : nouveau `apple-auth.test.ts` (9 tests : signature RSA réelle sur
+  JWKS mocké, audience/émetteur/expiration/signature invalides → 401, même
+  `sub` → même compte, cache JWKS, `displayName` à la création). Suite serveur :
+  **178 tests verts** ; typecheck serveur + mobile OK ; `npx expo export -p web`
+  OK (modules natifs importés dynamiquement, web inchangé).
 
 ### 2026-07-17 — Claude : signaler un commentaire + bloquer un utilisateur (stores A4, Apple 1.2)
 - **Prisma — migration `20260717120000_report_comments_and_blocks`** :

@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.plottime.app",
+      "usesAppleSignIn": true,
       "icon": "./assets/branding/icon-universal-ios-1024.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -40,7 +41,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "expo-apple-authentication"
     ],
     "extra": {
       "serverUrl": ""

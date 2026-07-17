@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createPublicKey, randomBytes, verify as cryptoVerify } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -187,11 +187,100 @@ async function verifyDiscordToken(accessToken: string): Promise<OAuthProfile> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Sign in with Apple : le client (expo-apple-authentication) obtient un
+// identityToken (JWT RS256 signé par Apple). On le vérifie ici SANS dépendance
+// externe : clés publiques JWKS d'Apple (cache mémoire 24 h) + crypto natif
+// Node, puis contrôle des claims (émetteur, expiration, audience = bundle id).
+// ---------------------------------------------------------------------------
+
+type AppleJwk = { kty: string; kid: string; alg?: string; n: string; e: string };
+let appleKeysCache: { keys: AppleJwk[]; fetchedAt: number } | null = null;
+const APPLE_KEYS_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function fetchAppleKeys(forceRefresh = false): Promise<AppleJwk[]> {
+  const now = Date.now();
+  if (!forceRefresh && appleKeysCache && now - appleKeysCache.fetchedAt < APPLE_KEYS_TTL_MS) {
+    return appleKeysCache.keys;
+  }
+  const res = await fetch('https://appleid.apple.com/auth/keys');
+  if (!res.ok) throw new Error('apple_keys_unavailable');
+  const data = (await res.json()) as { keys?: AppleJwk[] };
+  if (!Array.isArray(data.keys) || data.keys.length === 0) throw new Error('apple_keys_invalid');
+  appleKeysCache = { keys: data.keys, fetchedAt: now };
+  return data.keys;
+}
+
+function decodeJwtPart<T>(part: string): T {
+  return JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as T;
+}
+
+async function verifyAppleToken(identityToken: string): Promise<OAuthProfile> {
+  const audience = env.APPLE_BUNDLE_ID.trim();
+  if (!audience) throw new Error('apple_not_configured');
+
+  const [headerPart, payloadPart, signaturePart, extra] = identityToken.split('.');
+  if (!headerPart || !payloadPart || !signaturePart || extra !== undefined) {
+    throw new Error('apple_token_malformed');
+  }
+  let header: { alg?: string; kid?: string };
+  let payload: {
+    iss?: string;
+    aud?: string;
+    exp?: number;
+    sub?: string;
+    email?: string;
+    email_verified?: string | boolean;
+  };
+  try {
+    header = decodeJwtPart(headerPart);
+    payload = decodeJwtPart(payloadPart);
+  } catch {
+    throw new Error('apple_token_malformed');
+  }
+  if (header.alg !== 'RS256' || !header.kid) throw new Error('apple_token_bad_header');
+
+  // Signature RS256 : clé publique Apple correspondant au `kid` du jeton.
+  // Si le kid est inconnu (rotation de clés), on force un rafraîchissement.
+  let jwk = (await fetchAppleKeys()).find((k) => k.kid === header.kid);
+  if (!jwk) jwk = (await fetchAppleKeys(true)).find((k) => k.kid === header.kid);
+  if (!jwk) throw new Error('apple_unknown_key');
+  const publicKey = createPublicKey({ key: { kty: jwk.kty, n: jwk.n, e: jwk.e }, format: 'jwk' });
+  const signatureOk = cryptoVerify(
+    'RSA-SHA256',
+    Buffer.from(`${headerPart}.${payloadPart}`),
+    publicKey,
+    Buffer.from(signaturePart, 'base64url'),
+  );
+  if (!signatureOk) throw new Error('apple_bad_signature');
+
+  // Claims : émetteur Apple, non expiré, émis POUR NOTRE app (audience).
+  if (payload.iss !== 'https://appleid.apple.com') throw new Error('apple_bad_issuer');
+  if (typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now()) {
+    throw new Error('apple_token_expired');
+  }
+  if (payload.aud !== audience) throw new Error('apple_bad_audience');
+  if (!payload.sub) throw new Error('apple_no_sub');
+
+  return {
+    providerId: payload.sub,
+    // Apple ne transmet l'e-mail qu'au premier login (ou relais privé) ; le
+    // jeton porte email_verified en chaîne OU booléen selon les versions.
+    email: payload.email ?? null,
+    emailVerified: payload.email_verified === 'true' || payload.email_verified === true,
+    // Apple n'envoie JAMAIS le nom dans le jeton : le client le fournit à part
+    // (champ displayName de /oauth, utilisé uniquement à la création du compte).
+    displayName: 'Utilisateur',
+    avatarUrl: null,
+  };
+}
+
 async function verifyOAuth(provider: Provider, token: string): Promise<OAuthProfile> {
   if (provider === 'google') return verifyGoogleToken(token);
   if (provider === 'facebook') return verifyFacebookToken(token);
   if (provider === 'discord') return verifyDiscordToken(token);
-  throw new Error('provider_not_supported'); // Apple : à venir.
+  if (provider === 'apple') return verifyAppleToken(token);
+  throw new Error('provider_not_supported');
 }
 
 // Connexion SSO en 3 temps :
@@ -250,11 +339,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return {
       google: googleClientId.length > 0,
       googleClientId,
+      // Client IDs Google dédiés aux builds NATIFS (expo-auth-session). Vides
+      // tant que les apps iOS/Android ne sont pas créées dans la console
+      // Google ; penser à les ajouter aussi à GOOGLE_CLIENT_IDS (audience).
+      googleIosClientId: env.GOOGLE_IOS_CLIENT_ID.trim(),
+      googleAndroidClientId: env.GOOGLE_ANDROID_CLIENT_ID.trim(),
       facebook: env.FACEBOOK_APP_ID.trim().length > 0,
       facebookAppId: env.FACEBOOK_APP_ID.trim(),
       discord: discordClientId.length > 0,
       discordClientId,
-      apple: false, // à venir (nécessite un compte Apple Developer).
+      // Sign in with Apple (natif iOS) : la vérification ne demande aucun
+      // secret — seulement l'audience attendue (APPLE_BUNDLE_ID).
+      apple: env.APPLE_BUNDLE_ID.trim().length > 0,
       password: true,
     };
   });
@@ -263,7 +359,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // un compte existant si l'e-mail vérifié correspond (voir loginOrLinkOAuth).
   app.post('/api/auth/oauth', { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } }, async (request, reply) => {
     const body = z
-      .object({ provider: z.enum(['google', 'facebook', 'discord']), token: z.string().min(1) })
+      .object({
+        provider: z.enum(['google', 'facebook', 'discord', 'apple']),
+        token: z.string().min(1),
+        // Apple n'envoie le nom qu'au CLIENT (fullName du premier login) : le
+        // mobile le transmet ici. Utilisé UNIQUEMENT à la création du compte
+        // (loginOrLinkOAuth n'écrit displayName que dans prisma.user.create).
+        displayName: z.string().min(1).max(80).optional(),
+      })
       .parse(request.body);
     let profile: OAuthProfile;
     try {
@@ -271,6 +374,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.code(401).send({ error: 'invalid_oauth_token' });
     }
+    if (body.displayName?.trim()) profile.displayName = body.displayName.trim();
     const user = await loginOrLinkOAuth(body.provider, profile);
     const session = await createSession(user.id);
     return { user: serializeUser(user), token: session.token, expiresAt: session.expiresAt };
@@ -279,7 +383,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   // Lier une méthode SSO au compte connecté (depuis les réglages « comptes liés »).
   app.post('/api/auth/link', { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } }, preHandler: requireAuth }, async (request, reply) => {
     const body = z
-      .object({ provider: z.enum(['google', 'facebook', 'discord']), token: z.string().min(1) })
+      .object({ provider: z.enum(['google', 'facebook', 'discord', 'apple']), token: z.string().min(1) })
       .parse(request.body);
     let profile: OAuthProfile;
     try {
