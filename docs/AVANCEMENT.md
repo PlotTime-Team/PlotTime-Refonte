@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-18** (Codex) — lot 3 Prisme : cartes d’épisodes et états partagés
+Dernière mise à jour : **2026-07-18** (Codex) — lot 4 Prisme : Agenda et aperçu Films responsive
 
 ---
 
@@ -28,7 +28,7 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 | Domaine | État | Notes |
 |---|---|---|
-| Refonte front Prisme | 🛠 Lots 1–3 implémentés | Socle accessible, navigation cible, cartes d’épisodes et états partagés modernisés ; anciennes routes Films/Jeux conservées. Matrice : [`docs/feature-parity-matrix.md`](feature-parity-matrix.md) |
+| Refonte front Prisme | 🛠 Lots 1–4 implémentés | Socle accessible, navigation cible, cartes d’épisodes, Agenda et aperçu Films responsive ; anciennes routes Films/Jeux conservées. Matrice : [`docs/feature-parity-matrix.md`](feature-parity-matrix.md) |
 | Authentification multi-comptes (e-mail + mot de passe) | ✅ Fait | Inscription/connexion, sessions 30 j, données isolées par compte (testé) ; mot de passe oublié → réinitialisation par ré-auth SSO Google/Discord (testé) |
 | SSO Google / Facebook | ⏸ Préparé, désactivé | Prêt côté serveur (`/api/auth/oauth`) ; nécessite ids OAuth + dev build Expo |
 | Auth native stores (Apple / Google / Discord) | ⏸ Codé, en attente credentials | Serveur : vérif Sign in with Apple (JWT RS256, testée) + `/providers` enrichi. Mobile : `NativeSsoButtons` (bouton Apple officiel, Google expo-auth-session, Discord PKCE), config-gated — s'active dès que les vars env seront posées (voir STORES.md « A1 — état d'avancement ») |
@@ -90,6 +90,21 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-18 — Codex : Agenda et aperçu Films Prisme
+- **Agenda** : cartes chronologiques, miniatures de repli et événements passés
+  adoptent la hiérarchie Prisme sans masquer les informations déjà diffusées.
+- **Parité temporelle** : le défilement initial vers aujourd’hui, l’accès aux
+  groupes passés, les horaires, chaînes, premières et épisodes multiples restent
+  inchangés, comme l’ouverture de la fiche série.
+- **Films** : l’aperçu historique conserve les deux jeux de données `/api/movies`
+  et l’ouverture de la fiche film, avec filtres segmentés et vrais compteurs.
+- **Responsive** : la grille Films passe automatiquement de 3 à 5 colonnes entre
+  mobile et desktop dans la largeur de contenu contrôlée.
+- **Accessibilité** : cartes Agenda nommées, retours d’appui visibles et filtres
+  exposés comme onglets sélectionnés.
+- **Validation** : typecheck mobile, contrôle de diff et export Expo Web validés
+  avec **41 routes statiques** ; aucun endpoint, modèle ou contrat modifié.
 
 ### 2026-07-18 — Codex : cartes d’épisodes et états partagés Prisme
 - **File de visionnage** : les cartes d’épisodes adoptent la hiérarchie Prisme,
