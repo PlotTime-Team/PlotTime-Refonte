@@ -66,8 +66,12 @@ model User {
   // Réglages applicatifs PAR UTILISATEUR (notifs, thème, abonnements…).
   setting            UserSetting?
 
-  // Signalements d'œuvres inappropriées émis par cet utilisateur.
+  // Signalements d'œuvres/commentaires inappropriés émis par cet utilisateur.
   reports            Report[]
+
+  // Blocages (modération UGC) : comptes que JE bloque / comptes qui me bloquent.
+  blocking           Block[]  @relation("blocking")
+  blockedBy          Block[]  @relation("blockedBy")
 
   // Un compte SSO est identifié de façon unique par (provider, providerId).
   // Les comptes "password" ont providerId = null (SQLite autorise plusieurs NULL).
@@ -619,6 +623,7 @@ model Comment {
   updatedAt DateTime @updatedAt
 
   reactions CommentReaction[]
+  reports   Report[]
 
   @@index([mediaId])
   @@index([episodeId])
@@ -681,22 +686,43 @@ model CommentReaction {
   @@index([commentId])
 }
 
-// Signalement d'une œuvre inappropriée (ex. hentai passé à travers le filtre).
+// Signalement d'une œuvre inappropriée (ex. hentai passé à travers le filtre)
+// OU d'un commentaire abusif (exigence stores : UGC signalable, Apple 1.2).
 // Stocké pour un tri manuel ultérieur (pas d'écran admin pour l'instant).
 model Report {
   id         String   @id @default(cuid())
   reporterId String
   reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
   mediaId    String?  // si l'œuvre existe en local
-  mediaType  String   // 'show' | 'movie' | 'game'
+  mediaType  String   // 'show' | 'movie' | 'game' | 'comment'
   tmdbId     String?
   igdbId     String?
+  // Commentaire signalé (mediaType 'comment') — supprimé avec le commentaire.
+  commentId  String?
+  comment    Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   title      String
-  reason     String   // ex. 'adult' (contenu 18+/porno) — extensible
+  reason     String   // ex. 'adult' (contenu 18+/porno), 'abuse' (commentaire) — extensible
   note       String?
   status     String   @default("pending") // pending | resolved | dismissed
   createdAt  DateTime @default(now())
 
   @@index([status, createdAt])
   @@index([reporterId])
+}
+
+// Blocage d'un utilisateur (exigence stores : pouvoir bloquer un auteur d'UGC).
+// Modèle simple façon « mute » Twitter, UNIDIRECTIONNEL : les contenus du
+// bloqué disparaissent des vues du bloqueur (fil, commentaires, recherche,
+// classement) — l'inverse n'est PAS filtré (être bloqué ne cache rien).
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("blocking", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("blockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
 }

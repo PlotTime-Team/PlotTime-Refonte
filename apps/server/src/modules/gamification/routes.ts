@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { XP_RULES } from '@serietime/core';
 import { prisma } from '../../db/client.js';
 import { requireAuth } from '../auth/routes.js';
+import { blockedIdSet } from '../social/blocks.js';
 import { meView, weekStartParis } from './service.js';
 
 export async function gamificationRoutes(app: FastifyInstance): Promise<void> {
@@ -22,11 +23,16 @@ export async function gamificationRoutes(app: FastifyInstance): Promise<void> {
   // (barème simple ×10, spec §6) pour éviter de charger les dates de
   // diffusion de toute la semaine de chaque ami.
   app.get('/api/gamification/leaderboard', async (request) => {
-    const follows = await prisma.follow.findMany({
-      where: { followerId: request.userId },
-      select: { followingId: true },
-    });
-    const ids = [request.userId, ...follows.map((f) => f.followingId)];
+    const [follows, blockedIds] = await Promise.all([
+      prisma.follow.findMany({
+        where: { followerId: request.userId },
+        select: { followingId: true },
+      }),
+      // Blocage : les comptes que j'ai bloqués sortent de MON classement
+      // (bloquer désabonne déjà, ceinture-bretelles — cf. social/blocks.ts).
+      blockedIdSet(request.userId),
+    ]);
+    const ids = [request.userId, ...follows.map((f) => f.followingId).filter((id) => !blockedIds.has(id))];
     const since = weekStartParis(new Date());
 
     const [episodes, movies, games, comments, users, progresses] = await Promise.all([

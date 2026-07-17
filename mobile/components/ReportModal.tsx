@@ -3,27 +3,30 @@ import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '@/lib/theme';
 
-// Modal de confirmation « Signaler cette œuvre » — partagé par les fiches
-// série/film (mobile/app/show/[id].tsx) et jeu (mobile/app/game/[id].tsx).
+// Modal de confirmation « Signaler » — partagé par les fiches série/film
+// (mobile/app/show/[id].tsx), jeu (mobile/app/game/[id].tsx) et les
+// commentaires (mobile/components/comments/CommentCard.tsx, via title/body).
 // Le POST /api/report est déclenché par l'appelant (onConfirm).
 export function ReportModal({
   visible,
   onClose,
   onConfirm,
+  title = 'Signaler cette œuvre',
+  body = 'Contenu inapproprié (ex. pornographie / hentai) ? Notre équipe vérifiera.',
 }: {
   visible: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  title?: string;
+  body?: string;
 }) {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="Fermer" />
       <View style={[styles.card, { bottom: insets.bottom + 8 }]}>
-        <Text style={styles.title}>Signaler cette œuvre</Text>
-        <Text style={styles.body}>
-          Contenu inapproprié (ex. pornographie / hentai) ? Notre équipe vérifiera.
-        </Text>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.body}>{body}</Text>
         <View style={styles.actions}>
           <Pressable
             style={[styles.btn, styles.btnGhost]}

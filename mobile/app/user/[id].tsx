@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, Platform, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { goBack } from '@/lib/nav';
@@ -39,6 +39,8 @@ type UserProfile = {
   displayName: string;
   avatarUrl: string | null;
   isFollowing: boolean;
+  // Blocage (moi → lui) : SUIVRE laisse place à « Débloquer » (stores, UGC).
+  isBlocked: boolean;
   isSelf: boolean;
   isPrivate: boolean;
   followersCount: number;
@@ -58,6 +60,8 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
+  // Confirmation « Bloquer/Débloquer NomUser ? » ouverte par le menu ⋯.
+  const [blockConfirm, setBlockConfirm] = useState(false);
   const focused = useIsFocused();
 
   // Comme sur l'onglet Profil : en-tête sombre fondu avec la barre de statut
@@ -104,6 +108,41 @@ export default function UserProfileScreen() {
     }
   };
 
+  // Bloquer/débloquer (modèle « mute » : ses contenus disparaissent de MES
+  // vues). Mutation OPTIMISTE sur isBlocked ; le blocage désabonne aussi dans
+  // les deux sens côté serveur → isFollowing retombe à false localement.
+  const toggleBlock = async () => {
+    if (!data || busy) return;
+    setBusy(true);
+    setBlockConfirm(false);
+    const wasBlocked = data.isBlocked;
+    await qc.cancelQueries({ queryKey: ['user', id] });
+    const prev = qc.getQueryData<UserProfile>(['user', id]);
+    qc.setQueryData<UserProfile>(['user', id], (d) =>
+      d
+        ? {
+            ...d,
+            isBlocked: !wasBlocked,
+            isFollowing: wasBlocked ? d.isFollowing : false,
+            followersCount: !wasBlocked && d.isFollowing ? Math.max(0, d.followersCount - 1) : d.followersCount,
+          }
+        : d,
+    );
+    try {
+      if (wasBlocked) await api.del(`/api/users/${data.id}/block`);
+      else await api.post(`/api/users/${data.id}/block`);
+      qc.invalidateQueries({ queryKey: ['user', id] });
+      // Ses contenus (fil, classement, commentaires) changent de visibilité.
+      qc.invalidateQueries({ queryKey: ['social'] });
+      qc.invalidateQueries({ queryKey: ['gamification'] });
+      qc.invalidateQueries({ queryKey: ['comments'] });
+    } catch {
+      if (prev) qc.setQueryData(['user', id], prev);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (isLoading) return <Loading />;
   if (!data) return <LoadError onRetry={refetch} busy={isRefetching} />;
 
@@ -117,6 +156,18 @@ export default function UserProfileScreen() {
         <Pressable onPress={() => goBack('/social')} hitSlop={12} style={styles.back} accessibilityRole="button" accessibilityLabel="Retour">
           <Feather name="chevron-left" size={28} color="#fff" />
         </Pressable>
+        {/* Menu ⋯ : bloquer/débloquer cet utilisateur (exigence stores UGC). */}
+        {!data.isSelf ? (
+          <Pressable
+            onPress={() => setBlockConfirm(true)}
+            hitSlop={12}
+            style={styles.menuBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Plus d'options"
+          >
+            <Feather name="more-horizontal" size={24} color="#fff" />
+          </Pressable>
+        ) : null}
         <View>
           <View style={styles.avatar}>
             <Text style={styles.avatarInit}>{data.displayName.slice(0, 1).toUpperCase()}</Text>
@@ -146,15 +197,32 @@ export default function UserProfileScreen() {
           </Text>
         </View>
         {!data.isSelf ? (
-          <Pressable style={[styles.followBtn, data.isFollowing && styles.followingBtn]} onPress={toggleFollow} disabled={busy}>
-            {busy ? (
-              <ActivityIndicator color={data.isFollowing ? COLORS.black : '#fff'} />
-            ) : (
-              <Text style={[styles.followText, data.isFollowing && styles.followingText]}>
-                {data.isFollowing ? 'ABONNÉ' : 'SUIVRE'}
-              </Text>
-            )}
-          </Pressable>
+          data.isBlocked ? (
+            // Compte bloqué : SUIVRE laisse place à « Débloquer ».
+            <Pressable
+              style={[styles.followBtn, styles.followingBtn]}
+              onPress={toggleBlock}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel={`Débloquer ${data.displayName}`}
+            >
+              {busy ? (
+                <ActivityIndicator color={COLORS.black} />
+              ) : (
+                <Text style={[styles.followText, styles.followingText]}>DÉBLOQUER</Text>
+              )}
+            </Pressable>
+          ) : (
+            <Pressable style={[styles.followBtn, data.isFollowing && styles.followingBtn]} onPress={toggleFollow} disabled={busy}>
+              {busy ? (
+                <ActivityIndicator color={data.isFollowing ? COLORS.black : '#fff'} />
+              ) : (
+                <Text style={[styles.followText, data.isFollowing && styles.followingText]}>
+                  {data.isFollowing ? 'ABONNÉ' : 'SUIVRE'}
+                </Text>
+              )}
+            </Pressable>
+          )
         ) : null}
       </View>
 
@@ -225,6 +293,39 @@ export default function UserProfileScreen() {
           <FavoriteRow title="Jeux préférés" items={data.favoriteGames} kind="game" />
         </>
       )}
+
+      {/* Confirmation bloquer/débloquer (menu ⋯) — même pattern que ReportModal. */}
+      <Modal visible={blockConfirm} transparent animationType="fade" onRequestClose={() => setBlockConfirm(false)}>
+        <Pressable style={styles.blockOverlay} onPress={() => setBlockConfirm(false)} accessibilityLabel="Fermer" />
+        <View style={[styles.blockCard, { bottom: insets.bottom + 8 }]}>
+          <Text style={styles.blockTitle}>
+            {data.isBlocked ? `Débloquer ${data.displayName} ?` : `Bloquer ${data.displayName} ?`}
+          </Text>
+          <Text style={styles.blockBody}>
+            {data.isBlocked
+              ? 'Ses commentaires et son activité seront de nouveau visibles.'
+              : 'Ses commentaires et son activité seront masqués.'}
+          </Text>
+          <View style={styles.blockActions}>
+            <Pressable
+              style={[styles.blockBtn, styles.blockBtnGhost]}
+              onPress={() => setBlockConfirm(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Annuler"
+            >
+              <Text style={styles.blockBtnGhostText}>Annuler</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.blockBtn, styles.blockBtnPrimary]}
+              onPress={toggleBlock}
+              accessibilityRole="button"
+              accessibilityLabel={data.isBlocked ? `Débloquer ${data.displayName}` : `Bloquer ${data.displayName}`}
+            >
+              <Text style={styles.blockBtnPrimaryText}>{data.isBlocked ? 'Débloquer' : 'Bloquer'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
     </Pop>
   );
@@ -279,6 +380,7 @@ function Counter({ n, label, border }: { n: number; label: string; border?: bool
 const styles = StyleSheet.create({
   header: { backgroundColor: '#20202a', alignItems: 'center', paddingBottom: 22, paddingHorizontal: 20 },
   back: { position: 'absolute', left: 12, top: 0, paddingTop: 8, height: 60, justifyContent: 'center' },
+  menuBtn: { position: 'absolute', right: 16, top: 0, paddingTop: 8, height: 60, justifyContent: 'center' },
   avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 2, borderColor: '#fff', backgroundColor: '#555', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   avatarInit: { color: '#fff', fontSize: 34, fontFamily: FONTS.extraBold },
   // Pastille de niveau : coin bas-droit de l'avatar, jaune, bord blanc.
@@ -313,6 +415,17 @@ const styles = StyleSheet.create({
   poster: { width: 108, aspectRatio: 2 / 3, borderRadius: 4, backgroundColor: COLORS.imagePlaceholder },
   posterEmpty: { alignItems: 'center', justifyContent: 'center' },
   locked: { alignItems: 'center', padding: 40, gap: 8 },
+  // Confirmation bloquer/débloquer (cotes alignées sur ReportModal).
+  blockOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: COLORS.overlay },
+  blockCard: { position: 'absolute', left: 8, right: 8, bottom: 8, backgroundColor: COLORS.white, borderRadius: 14, padding: 22 },
+  blockTitle: { color: COLORS.text, fontSize: 18, fontFamily: FONTS.extraBold, marginBottom: 10 },
+  blockBody: { color: COLORS.textMuted, fontSize: 15, fontFamily: FONTS.regular, lineHeight: 21, marginBottom: 20 },
+  blockActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
+  blockBtn: { paddingHorizontal: 20, paddingVertical: 11, borderRadius: 999 },
+  blockBtnGhost: { backgroundColor: COLORS.chipGrey },
+  blockBtnGhostText: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 14 },
+  blockBtnPrimary: { backgroundColor: COLORS.yellow },
+  blockBtnPrimaryText: { color: COLORS.onAccent, fontFamily: FONTS.extraBold, fontSize: 14 },
   lockedText: { color: COLORS.text, fontSize: 17, fontFamily: FONTS.bold, marginTop: 8 },
   lockedSub: { fontFamily: FONTS.regular, fontSize: 15, color: COLORS.textMuted },
 });

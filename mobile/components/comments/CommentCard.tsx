@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '@/lib/theme';
+import { api } from '@/lib/api';
 import { PopIn } from '@/components/anim';
+import { ReportModal } from '@/components/ReportModal';
 import type { CommentDto } from './types';
 import { dateFr } from './types';
 
 // Carte « Commentaires » (copie TV Time) : avatar, nom, date, corps, cœur ❤️,
 // réponses, partager, fil de réponses + composeur inline. Partagée par la
 // page plein écran (mobile/app/comments/[id].tsx) et le bottom sheet TikTok.
+// Les commentaires DES AUTRES portent une action « Signaler » (drapeau,
+// exigence stores UGC) — les siens gardent « Supprimer ».
 export function CommentCard(props: {
   comment: CommentDto;
   onHeart: (c: CommentDto) => void;
@@ -24,6 +28,42 @@ export function CommentCard(props: {
 }) {
   const { comment: c, onHeart, onRemove, onShare, replyOpen, onToggleReplies, isReplying, replyText, setReplyText, onPostReply, onOpenUser } = props;
 
+  // Signalement d'un commentaire d'autrui : modal de confirmation partagé
+  // (ReportModal), POST /api/report, puis feedback local « Signalé ✓ » sur la
+  // rangée (le serveur dédoublonne côté back, pas de toast global ici).
+  const [reportTarget, setReportTarget] = useState<CommentDto | null>(null);
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
+  const confirmReport = async () => {
+    const target = reportTarget;
+    setReportTarget(null);
+    if (!target) return;
+    setReportedIds((ids) => new Set(ids).add(target.id));
+    try {
+      await api.post('/api/report', {
+        commentId: target.id,
+        mediaType: 'comment',
+        title: target.body.slice(0, 80),
+        reason: 'abuse',
+      });
+    } catch {
+      // Silencieux : le signalement pourra être retenté (état local conservé
+      // volontairement pour ne pas inviter au spam).
+    }
+  };
+  const reportAction = (target: CommentDto, size: number) =>
+    reportedIds.has(target.id) ? (
+      <Text style={styles.reported}>Signalé ✓</Text>
+    ) : (
+      <Pressable
+        onPress={() => setReportTarget(target)}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Signaler ce commentaire"
+      >
+        <Feather name="flag" size={size} color={COLORS.textMuted} />
+      </Pressable>
+    );
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHead}>
@@ -38,7 +78,9 @@ export function CommentCard(props: {
           <Pressable onPress={() => onRemove(c)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Supprimer">
             <Feather name="trash-2" size={18} color={COLORS.textMuted} />
           </Pressable>
-        ) : null}
+        ) : (
+          reportAction(c, 18)
+        )}
       </View>
       <Text style={styles.body}>{c.body}</Text>
       <View style={styles.footer}>
@@ -87,7 +129,9 @@ export function CommentCard(props: {
                 <Pressable onPress={() => onRemove(r)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Supprimer">
                   <Feather name="trash-2" size={15} color={COLORS.textMuted} />
                 </Pressable>
-              ) : null}
+              ) : (
+                reportAction(r, 15)
+              )}
             </View>
           ))}
           {isReplying ? (
@@ -106,6 +150,15 @@ export function CommentCard(props: {
           ) : null}
         </View>
       ) : null}
+
+      {/* Confirmation de signalement (exigence stores : UGC signalable). */}
+      <ReportModal
+        visible={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        onConfirm={confirmReport}
+        title="Signaler ce commentaire"
+        body="Contenu haineux ou inapproprié ? Notre équipe vérifiera."
+      />
     </View>
   );
 }
@@ -119,6 +172,7 @@ const styles = StyleSheet.create({
   avatarInit: { color: '#fff', fontSize: 17, fontFamily: FONTS.extraBold },
   name: { color: COLORS.text, fontSize: 16, fontFamily: FONTS.bold },
   date: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.textMuted, marginTop: 1 },
+  reported: { fontSize: 12, fontFamily: FONTS.semiBold, color: COLORS.textMuted },
   body: { color: COLORS.text, fontFamily: FONTS.regular, fontSize: 16, lineHeight: 22, marginTop: 12 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 26, marginTop: 14 },
   footBtn: { flexDirection: 'row', alignItems: 'center', gap: 7 },

@@ -5,6 +5,7 @@ import { requireAuth } from '../auth/routes.js';
 import { mediaTitle, serializeMedia } from '../media/serialize.js';
 import { getUserLang } from '../media/userLang.js';
 import { notifyFollowers, notifyUser } from './notify.js';
+import { blockedIdSet } from './blocks.js';
 import { BADGES, findBlockedTerm } from '@serietime/core';
 import { meView, scheduleRecompute } from '../gamification/service.js';
 
@@ -143,13 +144,47 @@ export async function socialRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  // --- Blocage d'un utilisateur (modération UGC, exigence stores) ----------
+  // Modèle « mute » unidirectionnel (cf. blocks.ts) : bloquer masque les
+  // contenus du bloqué au bloqueur, et désabonne DANS LES DEUX SENS.
+  app.post('/api/users/:id/block', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (id === request.userId) return reply.code(400).send({ error: 'cannot_block_self' });
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) return reply.code(404).send({ error: 'not_found' });
+    // Idempotent : re-bloquer un compte déjà bloqué ne change rien.
+    await prisma.block.upsert({
+      where: { blockerId_blockedId: { blockerId: request.userId, blockedId: id } },
+      create: { blockerId: request.userId, blockedId: id },
+      update: {},
+    });
+    // Désabonnement bilatéral : plus aucun lien social entre les deux comptes.
+    await prisma.follow.deleteMany({
+      where: {
+        OR: [
+          { followerId: request.userId, followingId: id },
+          { followerId: id, followingId: request.userId },
+        ],
+      },
+    });
+    return { ok: true, blocked: true };
+  });
+
+  app.delete('/api/users/:id/block', async (request) => {
+    const { id } = request.params as { id: string };
+    // Idempotent : débloquer un compte non bloqué renvoie aussi ok.
+    await prisma.block.deleteMany({ where: { blockerId: request.userId, blockedId: id } });
+    return { ok: true, blocked: false };
+  });
+
   // --- Recherche d'utilisateurs -------------------------------------------
   app.get('/api/users/search', async (request) => {
     const { q } = z.object({ q: z.string().default('') }).parse(request.query ?? {});
     const term = q.trim();
     if (!term) return { users: [] };
+    const blockedIds = await blockedIdSet(request.userId);
     const users = await prisma.user.findMany({
-      where: { displayName: { contains: term }, id: { not: request.userId } },
+      where: { displayName: { contains: term }, id: { not: request.userId, notIn: [...blockedIds] } },
       take: 20,
     });
     const followingIds = await followingIdSet(request.userId);
@@ -169,13 +204,20 @@ export async function socialRoutes(app: FastifyInstance): Promise<void> {
       !!(await prisma.follow.findUnique({
         where: { followerId_followingId: { followerId: request.userId, followingId: id } },
       }));
+    // Blocage : moi (visiteur) → lui (profil consulté). Le profil reste
+    // consultable (modèle mute) ; le client remplace SUIVRE par « Débloquer ».
+    const isBlocked =
+      !isSelf &&
+      !!(await prisma.block.findUnique({
+        where: { blockerId_blockedId: { blockerId: request.userId, blockedId: id } },
+      }));
     // Gamification calculée TOUJOURS (réputation publique, même en restricted).
     const [followersCount, followingCount, gamification] = await Promise.all([
       prisma.follow.count({ where: { followingId: id } }),
       prisma.follow.count({ where: { followerId: id } }),
       publicGamification(id),
     ]);
-    const base = { ...publicUser(user), isFollowing, isSelf, followersCount, followingCount, gamification };
+    const base = { ...publicUser(user), isFollowing, isBlocked, isSelf, followersCount, followingCount, gamification };
 
     // Profil privé : niveau + trophées restent visibles, mais l'activité (stats,
     // séries récentes, favoris) est masquée aux non-abonnés.
@@ -235,7 +277,13 @@ export async function socialRoutes(app: FastifyInstance): Promise<void> {
   // --- Fil d'activité des abonnements --------------------------------------
   app.get('/api/social/feed', async (request) => {
     const lang = await getUserLang(request.userId);
-    const ids = [...(await followingIdSet(request.userId))];
+    // Filtrage blocage : bloquer désabonne déjà, mais on exclut aussi ici par
+    // sûreté (ex. follow recréé par un vieux client) — une seule requête Block.
+    const [followingIds, blockedIds] = await Promise.all([
+      followingIdSet(request.userId),
+      blockedIdSet(request.userId),
+    ]);
+    const ids = [...followingIds].filter((id) => !blockedIds.has(id));
     if (ids.length === 0) return { items: [] as FeedItem[] };
 
     const [events, comments, badges, progresses] = await Promise.all([
@@ -328,11 +376,16 @@ export async function socialRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/media/:id/comments', async (request) => {
     const { id } = request.params as { id: string };
     const { episodeId } = z.object({ episodeId: z.string().optional() }).parse(request.query ?? {});
-    const all = await prisma.comment.findMany({
-      where: { mediaId: id, ...(episodeId ? { episodeId } : {}) },
-      include: { user: true, reactions: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    // Blocage : les commentaires ET réponses des utilisateurs que j'ai bloqués
+    // disparaissent de ma vue (un Set chargé une fois, pas de N+1).
+    const blockedIds = await blockedIdSet(request.userId);
+    const all = (
+      await prisma.comment.findMany({
+        where: { mediaId: id, ...(episodeId ? { episodeId } : {}) },
+        include: { user: true, reactions: true },
+        orderBy: { createdAt: 'asc' },
+      })
+    ).filter((c) => !blockedIds.has(c.userId));
     const me = request.userId;
     const serialize = (c: (typeof all)[number]) => ({
       id: c.id,

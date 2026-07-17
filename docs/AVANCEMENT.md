@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-17** (Claude) — Pages légales publiques `/legal/*` (privacy, CGU + règles de communauté, suppression de compte) + section « À propos » avec attributions TMDb/TheTVDB/IGDB dans les Paramètres (conformité stores A2/A3/A5)
+Dernière mise à jour : **2026-07-17** (Claude) — Signalement de commentaires + blocage d'utilisateurs (exigences stores UGC, Apple 1.2 / docs/STORES.md A4)
 
 ---
 
@@ -19,7 +19,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 
 - **Branche de référence : `main`** (à cloner / puller). Le développement passe
   par des branches courtes fusionnées via pull request.
-- Tests : `pnpm test` (313 tests au 2026-07-17 : 158 core + 155 serveur).
+- Tests : `pnpm test` (327 tests au 2026-07-17 : 158 core + 169 serveur).
 - Lancement local : voir `README.md` (serveur `pnpm dev:server`, mobile `npx expo start -c`).
 
 ## État par domaine
@@ -60,6 +60,7 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 | Modération — suggestions (contenu adulte / porno) | ✅ Fait | Détection **porno ciblée** (sans bloquer la violence 18+) : module pur `packages/core/src/moderation/adultContent.ts` (`containsAdultContent` + `ADULT_MARKERS` multilingues fr/en/es/de/it/pt + japonais romanisé, tolérant leet/répétitions/séparateurs). TMDb : `include_adult=false` + `adult === true` + `containsAdultContent(titre/résumé)` sur flux/recherche/recos, **et** `without_keywords` (ids mots-clés porno via `/search/keyword`, désormais **nom exact** — plus de sur-blocage sentai/senpai/porco) sur `/discover`ᐧ **Hentai** détecté par item via `tmdbKeywordNames` (mot-clé `erotic`, animés uniquement) + mot-clé `erotic` ajouté au `without_keywords` des viviers animés. IGDB : thème « Erotic » (id 42) + `containsAdultContent(name, summary)` dans `isSafeGame` (testé) |
 | Contenu 18+ — interrupteur par utilisateur | ✅ Fait | Paramètres > Suggestions > « Contenu 18+ » (défaut **désactivé**) : `allowAdultContent` (`UserSetting`, helper caché `modules/settings/adultContent.ts`). Activé = débraye tout le filtrage adulte pour ce compte (`include_adult=true`, pas de `without_keywords`, pas de `containsAdultContent`, pas de thème IGDB 42, pas de vérif mots-clés) sur `/api/explore/feed`, `/explore/discover`, `/api/search`, `/api/explore/games` ; `include_adult`/clause IGDB font partie de la **clé de cache** → aucune contamination entre comptes (testé). Bibliothèque jamais filtrée |
 | Signalement d'œuvre inappropriée | ✅ Fait | Modèle `Report` (migration `reports`) + module `apps/server/src/modules/reports/routes.ts` (`POST /api/report`, anti-doublon par œuvre/statut pending). Action « Signaler » (icône `flag`) dans le menu ⋯ des fiches série/film (`show/[id].tsx`) et jeu (`game/[id].tsx`) → `ReportModal` de confirmation partagé, `reason: 'adult'`, toast neutre. Tri manuel ultérieur (pas d'écran admin) |
+| Signalement de commentaires + blocage d'utilisateurs (stores A4, Apple 1.2) | ✅ Fait | Migration `report_comments_and_blocks` : `Report.commentId` (cascade) + modèle `Block`. `POST /api/report` étendu (`mediaType 'comment'`, anti-doublon, 404) ; `POST/DELETE /api/users/:id/block` (idempotents, unfollow **bilatéral**, `isBlocked` sur `GET /api/users/:id`) ; filtrage « mute » **unidirectionnel** (Set chargé une fois, pas de N+1) : fil social, commentaires + réponses, recherche d'utilisateurs, classement hebdo. Mobile : drapeau « Signaler » sur les commentaires d'autrui (`CommentCard` + `ReportModal`, état « Signalé ✓ ») ; profil public : menu ⋯ → Bloquer/Débloquer avec confirmation, bouton SUIVRE → « DÉBLOQUER » (testé) |
 | Pages légales + attributions (conformité stores) | ✅ Fait | Module public `apps/server/src/modules/legal/routes.ts` (sans `requireAuth`) : `GET /legal/privacy` (politique de confidentialité RGPD), `GET /legal/terms` (CGU + règles de communauté UGC exigées par Apple), `GET /legal/delete-account` (page web de suppression exigée par Google Data Safety) — HTML statique sobre, pied « non affilié à TV Time ni à Whip Media » (testé). Mobile : section « À propos » dans Paramètres > Application (liens privacy/CGU + attributions obligatoires TMDb/TheTVDB/IGDB) |
 | Langue de contenu par utilisateur | ✅ Fait | Paramètres > Langue (fr/en/es/de/it/pt) : titres/résumés des séries et films traduits partout (À voir, À venir, bibliothèque, profil, fiches, recherche, explorer, fil social, listes) via TMDb `/translations` (`Media.translationsJson`, une requête par média, backfill en fond au changement de langue) ; jeux IGDB hors périmètre (nom international) |
 
@@ -80,6 +81,33 @@ app mobile **React Native + Expo** (`mobile/`, npm) + serveur **Fastify + Prisma
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-17 — Claude : signaler un commentaire + bloquer un utilisateur (stores A4, Apple 1.2)
+- **Prisma — migration `20260717120000_report_comments_and_blocks`** :
+  - `Report.commentId` (nullable, FK `Comment` onDelete Cascade) + `mediaType`
+    étendu à `'comment'` — un signalement de commentaire disparaît avec lui ;
+  - nouveau modèle `Block { blockerId, blockedId }` (`@@unique`, cascades User).
+- **Serveur — `modules/reports/routes.ts`** : `POST /api/report` accepte
+  `{ commentId, mediaType: 'comment', title: <extrait>, reason: 'abuse' }` ;
+  404 si le commentaire n'existe pas, 400 si `commentId` manquant, anti-doublon
+  étendu (même reporter + même commentaire encore `pending`).
+- **Serveur — blocage (`modules/social/blocks.ts` + `social/routes.ts` +
+  `gamification/routes.ts`)** : `POST/DELETE /api/users/:id/block` (idempotents,
+  400 auto-blocage, 404 inconnu ; bloquer **désabonne dans les deux sens**) ;
+  `GET /api/users/:id` expose `isBlocked` (moi → lui). Filtrage **unidirectionnel
+  façon « mute » Twitter** (être bloqué ne cache rien au bloqué) via un Set
+  chargé une fois par requête (pas de N+1) : fil social, commentaires + réponses
+  des médias, recherche d'utilisateurs, classement hebdo.
+- **Mobile** : drapeau « Signaler » sur les commentaires/réponses **des autres**
+  (`components/comments/CommentCard.tsx`, `ReportModal` réutilisé avec
+  titre/texte dédiés, état local « Signalé ✓ ») ; profil public
+  (`app/user/[id].tsx`) : menu ⋯ en haut à droite → confirmation
+  Bloquer/Débloquer (mutation optimiste `isBlocked`, invalidation
+  social/gamification/commentaires, bouton SUIVRE remplacé par « DÉBLOQUER »).
+- **Tests** : `reports.test.ts` +4 (signalement de commentaire) et nouveau
+  `blocks.test.ts` (10 tests : filtrages, unfollow bilatéral, non-réciprocité,
+  idempotence, restauration au déblocage). Suite serveur : **169 tests verts** ;
+  typecheck serveur + mobile OK.
 
 ### 2026-07-17 — Claude : pages légales publiques + attributions dans l'app (stores A2/A3/A5)
 - **Serveur — nouveau module `apps/server/src/modules/legal/routes.ts`** (enregistré
