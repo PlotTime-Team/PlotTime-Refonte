@@ -1,7 +1,7 @@
 # Matrice de parité fonctionnelle — refonte Prisme
 
 > Source de vérité fonctionnelle pour la refonte du front PlotTime.
-> Dernier audit : **2026-07-17** (`main@c148ed8`).
+> Dernier audit : **2026-07-18** (lot 10 Prisme — fiches détaillées).
 
 ## Règles de validation
 
@@ -27,7 +27,7 @@ Statuts : `Inventorié`, `En migration`, `Implémenté`, `Vérifié`, `Bloqué`.
 | Comptes liés | `/linked-accounts` | Affiche les providers, lie/délie Google, Discord et Facebook selon plateforme/config | `mobile/app/linked-accounts.tsx`, `lib/sso*` | `/api/auth/providers`, `/api/auth/link`, `/api/auth/unlink` | État occupé, erreur, dernier mode de connexion; Apple natif à auditer | Sous-page Compte dense | Inventorié |
 | Shell privé | `/(tabs)` | Garde d'auth, cinq destinations, re-tap = rafraîchissement/remise à zéro, nouvel accès Explorer = nouveau tirage | `(tabs)/_layout.tsx`, `TabBar.tsx`, `tabReset.ts` | QueryClient, store de reset | Safe areas, Android back, deep links | Accueil, Agenda, Explorer, Bibliothèque, Profil | Implémenté |
 | Accueil séries | `/(tabs)/index` — À voir | File groupée, historique masqué au-dessus, retour optimiste vu/non-vu, badges, `+N`, ouverture série et épisode | `(tabs)/index.tsx`, `EpisodeQueueCard`, `EpisodeSheet`, `FloatingSection` | `/api/shows/queue`, `/history`, `/api/episodes/:id/watched|unwatched` | Chargement, refresh, vide, erreur, rollback; tests épisodes serveur | Cartes et états Prisme implémentés ; composition globale en migration | En migration |
-| Fiche épisode | Feuille depuis l'accueil et les fiches | Navigation entre épisodes, vu/non-vu, tout le précédent, providers, note communauté, commentaires, ouverture série | `EpisodeSheet.tsx` | `/api/shows/:id/episodes`, `/community-ratings`, `/comments`, mutations épisodes | Double action, erreur, contenu absent | Feuille Prisme 280 ms, action primaire 44 px | Inventorié |
+| Fiche épisode | Feuille depuis l'accueil et les fiches | Navigation entre épisodes, vu/non-vu, tout le précédent, providers, note communauté, commentaires, ouverture série | `EpisodeSheet.tsx` | `/api/shows/:id/episodes`, `/community-ratings`, `/comments`, mutations épisodes | Double action, erreur, contenu absent | Feuille Prisme 280 ms, action primaire 44 px | Implémenté |
 | Agenda séries | `/(tabs)/agenda` | Sorties passées accessibles en remontant, groupes de dates, heure/chaîne, première, épisodes multiples | `agenda.tsx`, `UpcomingView` partagé depuis `index.tsx` | `/api/shows/upcoming` | Chargement, refresh, vide, erreur, date/heure manquante | Agenda Prisme, liste chronologique Studio | Implémenté |
 | Films — aperçu historique | `/(tabs)/movies` | Affiche films vus et à voir, ouverture fiche film | `(tabs)/movies.tsx` | `/api/movies` | Route masquée de la barre mais accessible depuis le hub et en deep link | Aperçu Films Prisme responsive ; route conservée | Implémenté |
 | Jeux — bibliothèque | `/(tabs)/games` | Groupes voulus/en cours/terminés/abandonnés/possédés, découverte, prochaines sorties, ajout IGDB et ouverture fiche | `(tabs)/games.tsx` | `/api/games`, `/discover`, `/upcoming`, `/add-from-igdb` | Route masquée de la barre mais accessible depuis le hub et en deep link | Bibliothèque Jeux + blocs Agenda/Explorer; route conservée | En migration |
@@ -42,11 +42,11 @@ Statuts : `Inventorié`, `En migration`, `Implémenté`, `Vérifié`, `Bloqué`.
 | Favoris films | `/library/favorite-movies` | Même comportement adapté aux films | `favorite-movies.tsx`, `components/favorites.tsx` | `/api/profile/favorites`, `/api/movies/:id/favorite`, `favSort` | Optimiste/rollback, vide, erreur | Bibliothèque > Favoris Films, grille Prisme responsive | Implémenté |
 | Favoris jeux | `/library/favorite-games` | Affichage et ouverture des jeux favoris | `favorite-games.tsx` | `/api/profile/favorites?type=game` | Chargement, vide, erreur; capacités moindres à documenter | Bibliothèque > Favoris Jeux, tri persistant et grille Prisme | Implémenté |
 | Réordre favoris | `/library/reorder-favorites?type=` | Glisser-déposer et sauvegarde de l'ordre par type | `reorder-favorites.tsx`, `DragGrid.tsx` | `/api/profile/favorites/reorder`, Zustand | Type invalide, mutation/rollback | Mode édition Prisme, contrat DragGrid trois colonnes conservé | Implémenté |
-| Détail série | `/show/[id]` | Consultation sans suivi; bannière/affiche, à propos, épisodes, casting, similaires, communauté, listes, personnalisation, partage, signalement, favori, watch later, abandon, suppression | `mobile/app/show/[id].tsx` | `/api/shows/:id` et sous-routes, listes, report, tracking | Média externe/local, image absente, mutation optimiste, erreur; nombreux tests serveur | Fiche MediaDetail Prisme + épisodes Studio | Inventorié |
-| Détail film | `/show/[id]?type=movie` | Même shell adapté : vu/non-vu, watchlist, casting, similaires, listes, personnalisation, partage, signalement, favori, retrait | `mobile/app/show/[id].tsx` | `/api/movies/:id` et sous-routes | Paramètre `type`, média externe/local, erreurs | Fiche MediaDetail Film | Inventorié |
-| Détail jeu | `/game/[id]` | Statut, possédé, favori, retrait, affiche/bannière, bande-annonce, identité, extensions, listes, partage, signalement, commentaires et jeux liés | `mobile/app/game/[id].tsx` | `/api/games/:id` et sous-routes, listes, report | IGDB/local, provider absent, mutation/rollback | Fiche MediaDetail Jeu | Inventorié |
-| Personne | `/person?mediaId&type&index` | Casting, biographie, filmographie, résolution/ajout du média puis ouverture | `mobile/app/person.tsx` | `/api/:type/:id`, `/api/people/search|:id`, `/add-from-tmdb` | Paramètres invalides, personne sans ID/image | Fiche Personne Prisme | Inventorié |
-| Commentaires média | `/comments/[id]?title=` | Fils, réponses, réactions, suppression de ses commentaires, signalement d'autrui, profils publics | `comments/[id].tsx`, `components/comments/*` | `/api/media/:id/comments`, `/comments/:id/react`, `/report` | Modération bloquante, envoi vide/double, erreur, pagination future | Discussion Studio + composeur safe-area | Inventorié |
+| Détail série | `/show/[id]` | Consultation sans suivi; bannière/affiche, à propos, épisodes, casting, similaires, communauté, listes, personnalisation, partage, signalement, favori, watch later, abandon, suppression | `mobile/app/show/[id].tsx` | `/api/shows/:id` et sous-routes, listes, report, tracking | Média externe/local, image absente, mutation optimiste, erreur; nombreux tests serveur | Fiche MediaDetail Prisme + épisodes Studio | Implémenté |
+| Détail film | `/show/[id]?type=movie` | Même shell adapté : vu/non-vu, watchlist, casting, similaires, listes, personnalisation, partage, signalement, favori, retrait | `mobile/app/show/[id].tsx` | `/api/movies/:id` et sous-routes | Paramètre `type`, média externe/local, erreurs | Fiche MediaDetail Film | Implémenté |
+| Détail jeu | `/game/[id]` | Statut, possédé, favori, retrait, affiche/bannière, bande-annonce, identité, extensions, listes, partage, signalement, commentaires et jeux liés | `mobile/app/game/[id].tsx` | `/api/games/:id` et sous-routes, listes, report | IGDB/local, provider absent, mutation/rollback | Fiche MediaDetail Jeu | Implémenté |
+| Personne | `/person?mediaId&type&index` | Casting, biographie, filmographie, résolution/ajout du média puis ouverture | `mobile/app/person.tsx` | `/api/:type/:id`, `/api/people/search|:id`, `/add-from-tmdb` | Paramètres invalides, personne sans ID/image | Fiche Personne Prisme | Implémenté |
+| Commentaires média | `/comments/[id]?title=` | Fils, réponses, réactions, suppression de ses commentaires, signalement d'autrui, profils publics | `comments/[id].tsx`, `components/comments/*` | `/api/media/:id/comments`, `/comments/:id/react`, `/report` | Modération bloquante, envoi vide/double, erreur, pagination future | Discussion Studio + composeur safe-area | Implémenté |
 | Profil | `/(tabs)/profile` | Couverture/avatar, niveau, édition, notifications, réglages, compteurs sociaux, stats, trophées, listes, collections et favoris des 3 médias | `(tabs)/profile.tsx` | `/api/profile`, `/notifications/unread-count`, `/gamification/me`, Zustand favoris | Chargement, refresh, erreur, valeurs absentes | Profil Prisme enrichi, responsive et accessible, sans perte de sections | Implémenté |
 | Édition profil | `/profile/edit` | Avatar compressé, nom, naissance, genre, pays, accès couverture, sauvegarde | `profile/edit.tsx` | `/api/profile`, image picker/manipulator | Permission refusée, image trop grande, erreur sauvegarde | Formulaire Prisme | Inventorié |
 | Couverture profil | `/profile/cover` | Recherche d'œuvre, récupération des bannières, sélection et retour | `profile/cover.tsx` | `/api/search`, `/add-*`, `/images`, profil | Debounce, vide, provider absent, image absente | Sélecteur visuel Prisme | Inventorié |
@@ -72,16 +72,6 @@ Statuts : `Inventorié`, `En migration`, `Implémenté`, `Vérifié`, `Bloqué`.
 Ces éléments ne doivent pas être attribués à la refonte. Ils seront corrigés dans
 des lots séparés quand cela ne change pas le produit attendu.
 
-- Les actions de saison utilisent un test de vérité sur `seasonNumber` : la saison
-  `0` peut envoyer `{}` et viser toutes les saisons.
-- Le client accepte un mot de passe de 6 caractères alors que le serveur en exige
-  8, ce qui crée une validation contradictoire.
-- Les activités et commentaires liés aux jeux sont routés à tort vers `/show` au
-  lieu de la fiche jeu.
-- Les signalements peuvent être affichés comme réussis même lorsque la requête
-  réseau échoue.
-- Les invalidations de cache après mutation sont incomplètes entre jeux, profil et
-  gamification.
 - Plusieurs longues listes utilisent des `ScrollView` non virtualisées et chaque
   item peut enregistrer son propre listener de réduction des mouvements.
 - Des éléments visibles ou techniques hérités de SerieTime/TV Time restent à
@@ -93,9 +83,6 @@ des lots séparés quand cela ne change pas le produit attendu.
   n'invalide pas tous les caches après confirmation.
 - Les archives ZIP envoyées pour l'import TV Time ne sont pas purgées après
   traitement.
-- Le client mobile appelle l'export de sauvegarde en `GET` alors que le serveur
-  l'expose en `POST`, ce qui produit une 404 en production ; le partage de
-  l'export et la restauration ne sont pas disponibles correctement sur natif.
 - L'écran de comptes liés est très incomplet sur natif et ne gère pas Apple.
 - Les listes personnalisées affichées sur le profil ne sont pas ouvrables et ne
   disposent pas d'un écran de gestion complet.
