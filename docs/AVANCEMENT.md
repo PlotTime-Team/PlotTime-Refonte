@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-18** (Codex) — lot 8 Prisme : Explorer complet
+Dernière mise à jour : **2026-07-18** (Codex) — lot 9 Prisme : bibliothèques et favoris
 
 ---
 
@@ -28,7 +28,7 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 | Domaine | État | Notes |
 |---|---|---|
-| Refonte front Prisme | 🛠 Lots 1–8 implémentés | Socle accessible, navigation cible, cartes d’épisodes, Agenda, aperçu Films, onboarding, profil, primitives de fiches et Explorer complet. Matrice : [`docs/feature-parity-matrix.md`](feature-parity-matrix.md) |
+| Refonte front Prisme | 🛠 Lots 1–9 implémentés | Socle accessible, navigation cible, cartes d’épisodes, Agenda, aperçu Films, onboarding, profil, primitives de fiches, Explorer, bibliothèques et favoris. Matrice : [`docs/feature-parity-matrix.md`](feature-parity-matrix.md) |
 | Authentification multi-comptes (e-mail + mot de passe) | ✅ Fait | Inscription/connexion, sessions 30 j, données isolées par compte (testé) ; mot de passe oublié → réinitialisation par ré-auth SSO Google/Discord (testé) |
 | SSO Google / Facebook | ⏸ Préparé, désactivé | Prêt côté serveur (`/api/auth/oauth`) ; nécessite ids OAuth + dev build Expo |
 | Auth native stores (Apple / Google / Discord) | ⏸ Codé, en attente credentials | Serveur : vérif Sign in with Apple (JWT RS256, testée) + `/providers` enrichi. Mobile : `NativeSsoButtons` (bouton Apple officiel, Google expo-auth-session, Discord PKCE), config-gated — s'active dès que les vars env seront posées (voir STORES.md « A1 — état d'avancement ») |
@@ -90,6 +90,17 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-18 — Codex : bibliothèques et favoris Prisme
+- **Séries et films** : grilles 3/4/5 colonnes, progression, regroupements,
+  filtres, tris, tirer-pour-actualiser et états réseau conservent leurs données.
+- **Favoris** : séries/films héritent des nouvelles cartes ; jeux favoris et mode
+  de réorganisation adoptent Prisme sans changer ordre, rollback ni sauvegarde.
+- **Responsive et accessibilité** : canevas 760 px, feuilles défilables en faible
+  hauteur, cibles 44 px et statuts/contrôles annoncés.
+- **Drag & drop** : contrat historique trois colonnes conservé et borné à 560 px.
+- **Validation** : revue croisée sans bloquant, typecheck, diff et export Expo Web
+  validés avec **41 routes statiques** ; endpoints et routes inchangés.
 
 ### 2026-07-18 — Codex : Explorer complet Prisme
 - **Recherche unifiée** : séries/films, jeux et utilisateurs gardent debounce,
