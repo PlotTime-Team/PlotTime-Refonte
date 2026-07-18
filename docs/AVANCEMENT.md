@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-18** (Codex) — lot 11 Prisme : communauté et notifications
+Dernière mise à jour : **2026-07-18** (Claude) — lot 12 Prisme : statistiques, badges, trophées, classements
 
 ---
 
@@ -90,6 +90,24 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-18 — Claude : statistiques, badges, trophées Prisme (lot 12)
+- **Reprise du chantier Prisme là où Codex s'était arrêté** (lots 1–11 déjà sur
+  `main`). Développement sur la branche `claude/plottime-refonte-lots-12-14-vonk3r`.
+- **Statistiques** (`/stats`) : canevas responsive `contentMax`, cartes surface
+  élevées, en-tête d'onglets sur surface, pastilles d'icône par section, eyebrows,
+  histogrammes maison recolorés (barre courante en violet Prisme), apparition en
+  cascade. Données, onglets Séries/Films, comparaison et lien Badges inchangés.
+- **Badges** (`/stats/badges`) : carte de synthèse « X / total » avec pastille
+  jaune, sections en cartes surface, grille verrouillé/débloqué conservée.
+- **Classement** (`/stats/leaderboard`) : lignes en cartes surface, médailles
+  or/argent/bronze sur les trois premiers rangs, ligne « vous » en accent violet.
+  Onglets Séries/Films, format de durée et état vide inchangés.
+- **Trophées** (`/trophies`) : canevas responsive, cartes surface élevées, blocs
+  niveau/streak/défis/badges/classement en tokens Prisme, modale de badge sur
+  surface avec bouton plein, squelette recalé. Toute la gamification (XP, paliers,
+  streaks, défis, badges, classement hebdo, modale) est préservée.
+- **Validation** : `tsc --noEmit` mobile vert.
 
 ### 2026-07-18 — Codex : communauté et notifications Prisme
 - **Communauté** : le fil, la recherche d’amis et les listes d’abonnés/abonnements

@@ -3,9 +3,10 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { COLORS, FONTS } from '@/lib/theme';
+import { COLORS, FONTS, RADIUS, SHADOW, SIZES, SPACE } from '@/lib/theme';
 import { PageHeader } from '@/components/PageHeader';
 import { Loading, LoadError } from '@/components/ui';
+import { AppearItem } from '@/components/anim';
 
 type Badge = {
   id: string;
@@ -18,7 +19,7 @@ type Badge = {
 };
 type BadgesResponse = { earned: number; total: number; sections: { title: string; badges: Badge[] }[] };
 
-// Badges / succès (façon TV Time, icônes maison). Débloqué = pastille colorée ;
+// Badges / succès (icônes maison Prisme). Débloqué = pastille colorée ;
 // verrouillé = grisé avec progression.
 export default function BadgesScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
@@ -28,43 +29,58 @@ export default function BadgesScreen() {
   });
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.pageMuted }}>
+    <View style={styles.screen}>
       <PageHeader title="Badges" />
       {isLoading ? (
         <Loading />
       ) : isError || !data ? (
         <LoadError onRetry={refetch} busy={isRefetching} />
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          <View style={styles.card}>
-            <Text style={styles.summary}>
-              <Text style={styles.summaryN}>{data.earned}</Text> badge{data.earned > 1 ? 's' : ''} sur {data.total}
-            </Text>
-          </View>
-          {data.sections.map((s) => (
-            <View key={s.title} style={styles.card}>
-              <Text style={styles.cardTitle}>{s.title}</Text>
-              <Text style={styles.cardCount}>{s.badges.filter((b) => b.earned).length}</Text>
-              <View style={styles.grid}>
-                {s.badges.map((b) => (
-                  <View key={b.id} style={styles.badge}>
-                    <View style={[styles.circle, b.earned ? { backgroundColor: b.color } : styles.circleLocked]}>
-                      <Feather name={b.icon} size={26} color={b.earned ? '#fff' : '#9a9a9a'} />
-                    </View>
-                    <Text style={[styles.badgeTitle, !b.earned && styles.lockedText]} numberOfLines={2}>
-                      {b.title}
-                    </Text>
-                    <Text style={styles.badgeDesc} numberOfLines={2}>{b.description}</Text>
-                    {!b.earned ? (
-                      <Text style={styles.progress}>
-                        {b.progress.current.toLocaleString('fr-FR')} / {b.progress.target.toLocaleString('fr-FR')}
-                      </Text>
-                    ) : null}
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <View style={styles.canvas}>
+            <View style={styles.list}>
+              <AppearItem index={0}>
+                <View style={[styles.card, styles.summaryCard]}>
+                  <View style={styles.summaryIcon}>
+                    <Feather name="award" size={22} color={COLORS.onAccent} />
                   </View>
-                ))}
-              </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.summaryN}>
+                      {data.earned}
+                      <Text style={styles.summaryTotal}> / {data.total}</Text>
+                    </Text>
+                    <Text style={styles.summaryLabel}>badge{data.earned > 1 ? 's' : ''} débloqué{data.earned > 1 ? 's' : ''}</Text>
+                  </View>
+                </View>
+              </AppearItem>
+              {data.sections.map((s, si) => (
+                <AppearItem key={s.title} index={si + 1}>
+                  <View style={styles.card}>
+                    <Text style={styles.eyebrow}>{s.badges.filter((b) => b.earned).length} / {s.badges.length} débloqués</Text>
+                    <Text style={styles.cardTitle}>{s.title}</Text>
+                    <View style={styles.grid}>
+                      {s.badges.map((b) => (
+                        <View key={b.id} style={styles.badge}>
+                          <View style={[styles.circle, b.earned ? { backgroundColor: b.color } : styles.circleLocked]}>
+                            <Feather name={b.icon} size={26} color={b.earned ? '#fff' : COLORS.textSoft} />
+                          </View>
+                          <Text style={[styles.badgeTitle, !b.earned && styles.lockedText]} numberOfLines={2}>
+                            {b.title}
+                          </Text>
+                          <Text style={styles.badgeDesc} numberOfLines={2}>{b.description}</Text>
+                          {!b.earned ? (
+                            <Text style={styles.progress}>
+                              {b.progress.current.toLocaleString('fr-FR')} / {b.progress.target.toLocaleString('fr-FR')}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </AppearItem>
+              ))}
             </View>
-          ))}
+          </View>
         </ScrollView>
       )}
     </View>
@@ -72,16 +88,32 @@ export default function BadgesScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 12, gap: 12, paddingBottom: 32 },
-  card: { backgroundColor: COLORS.white, borderRadius: 12, padding: 18, borderWidth: 1, borderColor: COLORS.borderLight },
-  summary: { color: COLORS.text, fontSize: 18, fontFamily: FONTS.regular },
-  summaryN: { color: COLORS.text, fontSize: 26, fontFamily: FONTS.extraBold },
-  cardTitle: { color: COLORS.text, fontSize: 19, fontFamily: FONTS.extraBold },
-  cardCount: { color: COLORS.text, fontSize: 32, fontFamily: FONTS.extraBold, marginTop: 2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 14, rowGap: 20 },
+  screen: { flex: 1, backgroundColor: COLORS.bg },
+  canvas: { width: '100%', maxWidth: SIZES.contentMax, alignSelf: 'center' },
+  scroll: { flexGrow: 1, paddingBottom: SPACE.xl },
+  list: { padding: SPACE.md, gap: SPACE.sm },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.card,
+    padding: SPACE.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    ...SHADOW.card,
+  },
+  summaryCard: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+  summaryIcon: {
+    width: SIZES.touch, height: SIZES.touch, borderRadius: RADIUS.control,
+    backgroundColor: COLORS.yellow, alignItems: 'center', justifyContent: 'center',
+  },
+  summaryN: { color: COLORS.text, fontSize: 30, lineHeight: 34, fontFamily: FONTS.extraBold },
+  summaryTotal: { color: COLORS.textMuted, fontSize: 20, fontFamily: FONTS.bold },
+  summaryLabel: { color: COLORS.textMuted, fontSize: 14, fontFamily: FONTS.regular, marginTop: 2 },
+  eyebrow: { color: COLORS.primary, fontFamily: FONTS.bold, fontSize: 11, letterSpacing: 0.9, textTransform: 'uppercase', marginBottom: SPACE.xxs },
+  cardTitle: { color: COLORS.text, fontSize: 18, lineHeight: 24, fontFamily: FONTS.extraBold },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: SPACE.md, rowGap: SPACE.lg },
   badge: { width: '25%', alignItems: 'center', paddingHorizontal: 4 },
   circle: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
-  circleLocked: { backgroundColor: '#ECECEC' },
+  circleLocked: { backgroundColor: COLORS.surfaceMuted, borderWidth: 1, borderColor: COLORS.borderLight },
   badgeTitle: { color: COLORS.text, fontSize: 12, fontFamily: FONTS.bold, textAlign: 'center', marginTop: 6 },
   lockedText: { color: COLORS.textMuted },
   badgeDesc: { fontSize: 10, fontFamily: FONTS.regular, color: COLORS.textSoft, textAlign: 'center', marginTop: 2 },
