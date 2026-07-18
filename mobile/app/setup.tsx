@@ -92,7 +92,7 @@ export default function Setup() {
       } else if (e instanceof ApiError && e.code === 'invalid_credentials') {
         setError('E-mail ou mot de passe incorrect.');
       } else if (e instanceof ApiError && e.code === 'validation_error') {
-        setError('Vérifiez l’e-mail et un mot de passe d’au moins 6 caractères.');
+        setError('Vérifiez l’e-mail et un mot de passe d’au moins 8 caractères.');
       } else {
         setError(mode === 'register' ? 'Impossible de créer le compte.' : 'Connexion impossible.');
       }
@@ -129,7 +129,7 @@ export default function Setup() {
   const canSubmit =
     !busy &&
     /\S+@\S+\.\S+/.test(email) &&
-    password.length >= 6 &&
+    password.length >= 8 &&
     (mode === 'login' || displayName.trim().length > 0);
   const compact = width < 480;
 
@@ -392,7 +392,7 @@ export default function Setup() {
                           textContentType={mode === 'register' ? 'newPassword' : 'password'}
                           returnKeyType="done"
                           accessibilityLabel="Mot de passe"
-                          placeholder="6 caractères minimum"
+                          placeholder="8 caractères minimum"
                           placeholderTextColor={COLORS.text}
                         />
                       </View>

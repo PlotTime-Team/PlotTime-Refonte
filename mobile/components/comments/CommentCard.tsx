@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '@/lib/theme';
 import { api } from '@/lib/api';
@@ -37,7 +37,6 @@ export function CommentCard(props: {
     const target = reportTarget;
     setReportTarget(null);
     if (!target) return;
-    setReportedIds((ids) => new Set(ids).add(target.id));
     try {
       await api.post('/api/report', {
         commentId: target.id,
@@ -45,9 +44,12 @@ export function CommentCard(props: {
         title: target.body.slice(0, 80),
         reason: 'abuse',
       });
+      setReportedIds((ids) => new Set(ids).add(target.id));
     } catch {
-      // Silencieux : le signalement pourra être retenté (état local conservé
-      // volontairement pour ne pas inviter au spam).
+      Alert.alert(
+        'Signalement impossible',
+        'Le commentaire n’a pas pu être signalé. Vérifie ta connexion puis réessaie.',
+      );
     }
   };
   const reportAction = (target: CommentDto, size: number) =>

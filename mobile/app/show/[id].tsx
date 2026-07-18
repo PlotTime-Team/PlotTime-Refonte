@@ -163,7 +163,7 @@ export default function ShowDetail() {
   };
 
   // Signalement : envoie l'œuvre à l'équipe de modération (tri manuel).
-  // Échec silencieux — toast neutre dans tous les cas.
+  // Le succès n’est affiché qu’après confirmation du serveur.
   const submitReport = async () => {
     setReportOpen(false);
     const m: MediaDto | undefined = detail.data?.media;
@@ -176,10 +176,10 @@ export default function ShowDetail() {
         title: m.title,
         reason: 'adult',
       });
+      showToast('Merci, signalement envoyé 👍');
     } catch {
-      // Erreur silencieuse : on remercie quand même (pas de fuite d'état serveur).
+      showToast('Signalement impossible. Réessaie.');
     }
-    showToast('Merci, signalement envoyé 👍');
   };
 
   // En-tête repliable façon TV Time : la bannière se réduit en barre compacte
@@ -1091,7 +1091,7 @@ function EpisodesTab({ showId, title, posterPath, onChange, onScroll, topPad }: 
     onSettled: refresh,
   });
   const markAll = useMutation({
-    mutationFn: (seasonNumber?: number) => api.post(`/api/shows/${showId}/mark-all-watched`, seasonNumber ? { seasonNumber } : {}),
+    mutationFn: (seasonNumber?: number) => api.post(`/api/shows/${showId}/mark-all-watched`, seasonNumber !== undefined ? { seasonNumber } : {}),
     onMutate: async (seasonNumber?: number) => {
       await qc.cancelQueries({ queryKey: ['show', showId, 'episodes'] });
       const prev = qc.getQueryData<EpisodesData>(['show', showId, 'episodes']);
@@ -1150,7 +1150,7 @@ function EpisodesTab({ showId, title, posterPath, onChange, onScroll, topPad }: 
   // Tout démarquer (hors spéciaux quand aucune saison précise), avec la même
   // mise à jour optimiste que « tout marquer ».
   const markAllUnwatched = useMutation({
-    mutationFn: (seasonNumber?: number) => api.post(`/api/shows/${showId}/mark-all-unwatched`, seasonNumber ? { seasonNumber } : {}),
+    mutationFn: (seasonNumber?: number) => api.post(`/api/shows/${showId}/mark-all-unwatched`, seasonNumber !== undefined ? { seasonNumber } : {}),
     onMutate: async (seasonNumber?: number) => {
       await qc.cancelQueries({ queryKey: ['show', showId, 'episodes'] });
       const prev = qc.getQueryData<EpisodesData>(['show', showId, 'episodes']);

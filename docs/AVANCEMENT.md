@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-18** (Codex) — correctif fonctionnel : export de sauvegarde
+Dernière mise à jour : **2026-07-18** (Codex) — correctifs de parité fonctionnelle critiques
 
 ---
 
@@ -63,8 +63,8 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 | Modération — commentaires (haine/insultes graves) | ✅ Fait | Module pur `packages/core/src/moderation/` (blocklist curée multilingue fr/en/es/de/it/pt × racisme/antisémitisme/homophobie/sexisme/injures sexuelles/violence + filtre tolérant leetspeak/répétitions/séparateurs/accents, frontière de mot pour termes courts) ; `POST /api/media/:id/comments` rejette (400 `comment_blocked`) commentaires **et** réponses ; mobile affiche le message renvoyé (testé, 0 faux positif sur la batterie légitime) |
 | Modération — suggestions (contenu adulte / porno) | ✅ Fait | Détection **porno ciblée** (sans bloquer la violence 18+) : module pur `packages/core/src/moderation/adultContent.ts` (`containsAdultContent` + `ADULT_MARKERS` multilingues fr/en/es/de/it/pt + japonais romanisé, tolérant leet/répétitions/séparateurs). TMDb : `include_adult=false` + `adult === true` + `containsAdultContent(titre/résumé)` sur flux/recherche/recos, **et** `without_keywords` (ids mots-clés porno via `/search/keyword`, désormais **nom exact** — plus de sur-blocage sentai/senpai/porco) sur `/discover`ᐧ **Hentai** détecté par item via `tmdbKeywordNames` (mot-clé `erotic`, animés uniquement) + mot-clé `erotic` ajouté au `without_keywords` des viviers animés. IGDB : thème « Erotic » (id 42) + `containsAdultContent(name, summary)` dans `isSafeGame` (testé) |
 | Contenu 18+ — interrupteur par utilisateur | ✅ Fait | Paramètres > Suggestions > « Contenu 18+ » (défaut **désactivé**) : `allowAdultContent` (`UserSetting`, helper caché `modules/settings/adultContent.ts`). Activé = débraye tout le filtrage adulte pour ce compte (`include_adult=true`, pas de `without_keywords`, pas de `containsAdultContent`, pas de thème IGDB 42, pas de vérif mots-clés) sur `/api/explore/feed`, `/explore/discover`, `/api/search`, `/api/explore/games` ; `include_adult`/clause IGDB font partie de la **clé de cache** → aucune contamination entre comptes (testé). Bibliothèque jamais filtrée |
-| Signalement d'œuvre inappropriée | ✅ Fait | Modèle `Report` (migration `reports`) + module `apps/server/src/modules/reports/routes.ts` (`POST /api/report`, anti-doublon par œuvre/statut pending). Action « Signaler » (icône `flag`) dans le menu ⋯ des fiches série/film (`show/[id].tsx`) et jeu (`game/[id].tsx`) → `ReportModal` de confirmation partagé, `reason: 'adult'`, toast neutre. Tri manuel ultérieur (pas d'écran admin) |
-| Signalement de commentaires + blocage d'utilisateurs (stores A4, Apple 1.2) | ✅ Fait | Migration `report_comments_and_blocks` : `Report.commentId` (cascade) + modèle `Block`. `POST /api/report` étendu (`mediaType 'comment'`, anti-doublon, 404) ; `POST/DELETE /api/users/:id/block` (idempotents, unfollow **bilatéral**, `isBlocked` sur `GET /api/users/:id`) ; filtrage « mute » **unidirectionnel** (Set chargé une fois, pas de N+1) : fil social, commentaires + réponses, recherche d'utilisateurs, classement hebdo. Mobile : drapeau « Signaler » sur les commentaires d'autrui (`CommentCard` + `ReportModal`, état « Signalé ✓ ») ; profil public : menu ⋯ → Bloquer/Débloquer avec confirmation, bouton SUIVRE → « DÉBLOQUER » (testé) |
+| Signalement d'œuvre inappropriée | ✅ Fait | Modèle `Report` (migration `reports`) + module `apps/server/src/modules/reports/routes.ts` (`POST /api/report`, anti-doublon par œuvre/statut pending). Action « Signaler » dans les fiches série/film/jeu via `ReportModal` ; succès affiché seulement après confirmation serveur, erreur visible et nouvelle tentative possible. Tri manuel ultérieur (pas d'écran admin) |
+| Signalement de commentaires + blocage d'utilisateurs (stores A4, Apple 1.2) | ✅ Fait | Migration `report_comments_and_blocks` : `Report.commentId` (cascade) + modèle `Block`. `POST /api/report` étendu (`mediaType 'comment'`, anti-doublon, 404) ; blocage bilatéral et filtrage « mute » unidirectionnel. Mobile : drapeau « Signaler » sur les contenus d’autrui ; l’état « Signalé ✓ » n’apparaît qu’après succès serveur et une erreur reste retentable. Profil public : bloquer/débloquer avec confirmation (testé). |
 | Pages légales + attributions (conformité stores) | ✅ Fait | Module public `apps/server/src/modules/legal/routes.ts` (sans `requireAuth`) : `GET /legal/privacy` (politique de confidentialité RGPD), `GET /legal/terms` (CGU + règles de communauté UGC exigées par Apple), `GET /legal/delete-account` (page web de suppression exigée par Google Data Safety) — HTML statique sobre, pied « non affilié à TV Time ni à Whip Media » (testé). Mobile : section « À propos » dans Paramètres > Application (liens privacy/CGU + attributions obligatoires TMDb/TheTVDB/IGDB) |
 | Langue de contenu par utilisateur | ✅ Fait | Paramètres > Langue (fr/en/es/de/it/pt) : titres/résumés des séries et films traduits partout (À voir, À venir, bibliothèque, profil, fiches, recherche, explorer, fil social, listes) via TMDb `/translations` (`Media.translationsJson`, une requête par média, backfill en fond au changement de langue) ; jeux IGDB hors périmètre (nom international) |
 
@@ -90,6 +90,17 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-18 — Codex : garde-fous de parité fonctionnelle
+- **Saisons spéciales** : les actions « tout vu / tout non vu » transmettent
+  explicitement `seasonNumber: 0` au lieu de cibler les saisons régulières.
+- **Signalements fiables** : œuvres et commentaires n’affichent plus un faux
+  succès après une panne ; l’erreur est visible et l’action peut être retentée.
+- **Notifications de jeux** : leur métadonnée conserve désormais `mediaType: game`,
+  ce qui ouvre `/game/:id` au lieu d’une fiche série erronée.
+- **Authentification** : l’inscription exige 8 caractères côté client comme le
+  serveur, avec aide et message de validation cohérents.
+- **Validation** : 5 tests ciblés, typechecks mobile/serveur et diff validés.
 
 ### 2026-07-18 — Codex : export de sauvegarde réparé
 - **Contrat API** : le client utilise désormais le `POST /api/backup/export`

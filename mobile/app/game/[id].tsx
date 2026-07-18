@@ -162,7 +162,7 @@ export default function GameDetail() {
   };
 
   // Signalement : envoie l'œuvre à l'équipe de modération (tri manuel).
-  // Échec silencieux — toast neutre dans tous les cas.
+  // Le succès n’est affiché qu’après confirmation du serveur.
   const submitReport = async () => {
     setReportOpen(false);
     if (!detail.data) return;
@@ -174,10 +174,10 @@ export default function GameDetail() {
         title: detail.data.title,
         reason: 'adult',
       });
+      showToast('Merci, signalement envoyé 👍');
     } catch {
-      // Erreur silencieuse : on remercie quand même (pas de fuite d'état serveur).
+      showToast('Signalement impossible. Réessaie.');
     }
-    showToast('Merci, signalement envoyé 👍');
   };
 
   if (detail.isLoading) return <FicheSkeleton heroHeight={200} />;
