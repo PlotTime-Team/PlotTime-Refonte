@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
@@ -586,7 +586,7 @@ function EpisodePage({
 
   const openShow = () => {
     onClose();
-    router.push('/show/' + mediaId);
+    router.push(('/show/' + mediaId) as Href);
   };
 
   const hero =
@@ -817,12 +817,12 @@ function EpisodePage({
         ]}
         onPress={() => {
           onClose();
-          router.push(
+          router.push((
             '/comments/' +
               mediaId +
               '?title=' +
-              encodeURIComponent(mediaTitle),
-          );
+              encodeURIComponent(mediaTitle)
+          ) as Href);
         }}
         accessibilityRole="button"
         accessibilityLabel={

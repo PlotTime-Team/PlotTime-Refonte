@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-18** (Codex) — lot 10 Prisme : fiches détaillées
+Dernière mise à jour : **2026-07-18** (Codex) — lot 11 Prisme : communauté et notifications
 
 ---
 
@@ -28,7 +28,7 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 | Domaine | État | Notes |
 |---|---|---|
-| Refonte front Prisme | 🛠 Lots 1–10 implémentés | Socle accessible, navigation cible, cartes d’épisodes, Agenda, aperçu Films, onboarding, profil, primitives de fiches, Explorer, bibliothèques, favoris et fiches détaillées Série/Film, Jeu, Personne, Épisode et Commentaires. Matrice : [parité fonctionnelle](feature-parity-matrix.md) |
+| Refonte front Prisme | 🛠 Lots 1–11 implémentés | Socle accessible, navigation cible, cartes d’épisodes, Agenda, aperçu Films, onboarding, profils personnel/public, primitives de fiches, Explorer, bibliothèques, favoris, fiches détaillées, Communauté, relations, commentaires personnels et notifications. Matrice : [parité fonctionnelle](feature-parity-matrix.md) |
 | Authentification multi-comptes (e-mail + mot de passe) | ✅ Fait | Inscription/connexion, sessions 30 j, données isolées par compte (testé) ; mot de passe oublié → réinitialisation par ré-auth SSO Google/Discord (testé) |
 | SSO Google / Facebook | ⏸ Préparé, désactivé | Prêt côté serveur (`/api/auth/oauth`) ; nécessite ids OAuth + dev build Expo |
 | Auth native stores (Apple / Google / Discord) | ⏸ Codé, en attente credentials | Serveur : vérif Sign in with Apple (JWT RS256, testée) + `/providers` enrichi. Mobile : `NativeSsoButtons` (bouton Apple officiel, Google expo-auth-session, Discord PKCE), config-gated — s'active dès que les vars env seront posées (voir STORES.md « A1 — état d'avancement ») |
@@ -90,6 +90,28 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-18 — Codex : communauté et notifications Prisme
+- **Communauté** : le fil, la recherche d’amis et les listes d’abonnés/abonnements
+  adoptent des cartes Prisme, des listes virtualisées, le rafraîchissement et des
+  mutations optimistes verrouillées avec rollback et erreur visible.
+- **Parité multi-média** : activités et commentaires personnels ouvrent désormais
+  correctement les fiches Série, Film ou Jeu ; les profils restent accessibles
+  séparément sans boutons imbriqués sur le Web.
+- **Profil public** : avatar réel, confidentialité, suivi, blocage, réputation,
+  trophées, streaks, statistiques, récents et favoris des trois médias sont
+  conservés dans un canevas responsive et accessible.
+- **Notifications** : lecture globale, badge, états réseau et destinations média,
+  acteur, statistiques ou badges sont préservés et explicités dans le centre
+  Prisme chronologique.
+- **Routes Expo** : les navigations dynamiques Personne, recommandations, épisode
+  et commentaires ont reçu le type Href après régénération des routes, sans
+  changement de destination ni de logique.
+- **Validation** : typechecks mobile et monorepo validés ; 158 tests core validés ;
+  export Expo Web de 41 routes validé ; smoke visuel des 5 routes du lot à
+  390/1440 px sans débordement, erreur console, 404 ni erreur d’hydratation. Les
+  20 tests serveur sans base passent ; les 163 tests SQLite restent bloqués avant
+  exécution par le moteur Prisma (Schema engine error).
 
 ### 2026-07-18 — Codex : fiches détaillées Prisme
 - **Séries et films** : la fiche complète adopte Prisme sans modifier consultation,

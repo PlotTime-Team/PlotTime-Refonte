@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { goBack } from '@/lib/nav';
@@ -137,9 +137,9 @@ export default function PersonScreen() {
         tmdbId: item.tmdbId,
         follow: false,
       });
-      router.push(
-        '/show/' + result.mediaId + (item.mediaType === 'movie' ? '?type=movie' : ''),
-      );
+      router.push((
+        '/show/' + result.mediaId + (item.mediaType === 'movie' ? '?type=movie' : '')
+      ) as Href);
     } catch {
       setOpenError("Cette œuvre n'a pas pu être ouverte. Réessaie dans un instant.");
     } finally {

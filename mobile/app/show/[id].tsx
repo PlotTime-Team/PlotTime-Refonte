@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Pressable, Modal, TextInput, Activi
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -958,7 +958,7 @@ function useOpenRec(type: 'show' | 'movie') {
   const open = async (item: { tmdbId: string; localId?: string | null }) => {
     if (busyId) return;
     if (item.localId) {
-      router.push('/show/' + item.localId + (type === 'movie' ? '?type=movie' : ''));
+      router.push(('/show/' + item.localId + (type === 'movie' ? '?type=movie' : '')) as Href);
       return;
     }
     setBusyId(item.tmdbId);
@@ -967,7 +967,7 @@ function useOpenRec(type: 'show' | 'movie') {
         '/api/' + (type === 'movie' ? 'movies' : 'shows') + '/add-from-tmdb',
         { tmdbId: item.tmdbId, follow: false },
       );
-      router.push('/show/' + res.mediaId + (type === 'movie' ? '?type=movie' : ''));
+      router.push(('/show/' + res.mediaId + (type === 'movie' ? '?type=movie' : '')) as Href);
     } catch {
       Alert.alert('Import impossible', "Cette recommandation n'a pas pu être ouverte. Réessaie.");
     } finally {

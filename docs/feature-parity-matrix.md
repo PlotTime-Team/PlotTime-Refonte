@@ -50,11 +50,11 @@ Statuts : `Inventorié`, `En migration`, `Implémenté`, `Vérifié`, `Bloqué`.
 | Profil | `/(tabs)/profile` | Couverture/avatar, niveau, édition, notifications, réglages, compteurs sociaux, stats, trophées, listes, collections et favoris des 3 médias | `(tabs)/profile.tsx` | `/api/profile`, `/notifications/unread-count`, `/gamification/me`, Zustand favoris | Chargement, refresh, erreur, valeurs absentes | Profil Prisme enrichi, responsive et accessible, sans perte de sections | Implémenté |
 | Édition profil | `/profile/edit` | Avatar compressé, nom, naissance, genre, pays, accès couverture, sauvegarde | `profile/edit.tsx` | `/api/profile`, image picker/manipulator | Permission refusée, image trop grande, erreur sauvegarde | Formulaire Prisme | Inventorié |
 | Couverture profil | `/profile/cover` | Recherche d'œuvre, récupération des bannières, sélection et retour | `profile/cover.tsx` | `/api/search`, `/add-*`, `/images`, profil | Debounce, vide, provider absent, image absente | Sélecteur visuel Prisme | Inventorié |
-| Profil public | `/user/[id]` | Suivre, bloquer/débloquer, confidentialité, réputation, trophées, stats, favoris/récents, navigation médias | `user/[id].tsx` | `/api/users/:id`, `/follow`, `/block` | Soi-même, privé, bloqué, erreur | Profil public Prisme | Inventorié |
-| Connexions | `/social/connections?type=following|followers` | Listes, suivre/ne plus suivre, ouverture profils | `social/connections.tsx` | `/api/social/following|followers`, `/follow/:id` | Paramètre invalide, vide, erreur | Liste Studio | Inventorié |
-| Mes commentaires | `/social/my-comments` | Historique personnel et ouverture du média | `social/my-comments.tsx` | `/api/social/comments` | Vide, média supprimé, erreur | Activité Profil | Inventorié |
-| Fil social | `/social` | Activité des comptes suivis, onglet trouver des amis, profils et médias | `mobile/app/social.tsx` | `/api/social/feed`, `/users/search`, `/follow/:id` | Route actuellement peu exposée, vide, erreur | Profil > Activité/Communauté | Inventorié |
-| Notifications | `/notifications` | Liste in-app, marquage lu, badge, deep links vers série/film/jeu | `notifications.tsx` | `/api/notifications`, `/read` | Vide, métadonnées partielles, erreur; polling 30 s | Centre Prisme groupé chronologiquement | Inventorié |
+| Profil public | `/user/[id]` | Suivre, bloquer/débloquer, confidentialité, réputation, trophées, stats, favoris/récents, navigation médias | `user/[id].tsx` | `/api/users/:id`, `/follow`, `/block` | Soi-même, privé, bloqué, erreur | Profil public Prisme | Implémenté |
+| Connexions | `/social/connections?type=following|followers` | Listes, suivre/ne plus suivre, ouverture profils | `social/connections.tsx` | `/api/social/following|followers`, `/follow/:id` | Paramètre invalide, vide, erreur | Liste Studio | Implémenté |
+| Mes commentaires | `/social/my-comments` | Historique personnel et ouverture du média | `social/my-comments.tsx` | `/api/social/comments` | Vide, média supprimé, erreur | Activité Profil | Implémenté |
+| Fil social | `/social` | Activité des comptes suivis, onglet trouver des amis, profils et médias | `mobile/app/social.tsx` | `/api/social/feed`, `/users/search`, `/follow/:id` | Route actuellement peu exposée, vide, erreur | Profil > Activité/Communauté | Implémenté |
+| Notifications | `/notifications` | Liste in-app, marquage lu, badge, deep links vers série/film/jeu | `notifications.tsx` | `/api/notifications`, `/read` | Vide, métadonnées partielles, erreur; polling 30 s | Centre Prisme chronologique, deep links média/acteur/gamification | Implémenté |
 | Statistiques | `/stats` | Temps, volumes, répartitions, comparaison/classement, accès badges | `stats/index.tsx` | `/api/stats/detailed` | Chargement, valeurs nulles, erreur | Cartes Prisme + résumé accessible | Inventorié |
 | Badges statistiques | `/stats/badges` | Badges obtenus/verrouillés et progression | `stats/badges.tsx` | `/api/stats/badges` | Vide, erreur | Trophées Prisme regroupés | Inventorié |
 | Classements statistiques | `/stats/leaderboard` | Comparaison au classement | `stats/leaderboard.tsx` | `/api/stats/leaderboard` | Profil absent, égalités, erreur | Classement Studio | Inventorié |
@@ -90,8 +90,8 @@ des lots séparés quand cela ne change pas le produit attendu.
 - Le fil `/social` est difficilement atteignable depuis la navigation actuelle.
 - Le blocage social fonctionne comme un mute unidirectionnel et laisse possibles
   certaines interactions ou notifications entre comptes bloqués.
-- Les notifications exploitent peu `actorId`/`commentId` et redirigent surtout vers
-  le média.
+- Les notifications exploitent désormais le média typé, actorId en repli et les
+  destinations de gamification ; commentId n’ancre pas encore la discussion ciblée.
 - La politique de confidentialité doit être réalignée avec les tiers réellement
   utilisés et les durées effectives de conservation.
 - Le thème choisi explicitement est réellement persisté sur le Web seulement ; le
