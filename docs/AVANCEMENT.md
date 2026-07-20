@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-20** (Claude) — lots 12-14 basculés sur la version full-Prisme (arbitrage inversé à la demande d'Étienne) + préversion `/prisme/` redéployée
+Dernière mise à jour : **2026-07-20** (Claude) — fonctionnalités communautaires côté mobile : réactions ❤️ sur le fil, carrousel « Tes amis ont adoré », défi hebdo, streaks visibles, clubs par média (onglet Communauté)
 
 ---
 
@@ -90,6 +90,26 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-20 — Claude : 5 fonctionnalités communautaires (côté mobile)
+- **Réactions sur le fil** (`app/social.tsx`) : cœur ❤️ + compteur en pied de
+  chaque carte (média et badge), toggle `POST /api/social/feed/react` avec
+  mise à jour optimiste du cache `['social','feed']` (rollback si erreur).
+- **« Tes amis ont adoré »** : `FeedTab` accepte une prop `header` ; dans
+  l'onglet Communauté, carrousel horizontal de recommandations
+  (`/api/social/recommendations`) avec note moyenne et « Aimé par {prénoms} ».
+- **Défi de la semaine** (segment Classement) : PrismeCard au-dessus du
+  classement (`/api/social/challenge/weekly`) — rangs, avatars, minutes
+  depuis lundi, ProgressBar relative au leader, couronne or.
+- **Streaks visibles** : « 🔥 {streak} » à côté du nom sur le fil ; onglet
+  Amis : liste « Mes abonnements » (`/api/social/following`) affichée hors
+  recherche, avec « 🔥 {streak} · Nv. {level} » (jamais sur les résultats de
+  recherche, le serveur ne les y fournit pas).
+- **Clubs** : 4e segment de l'onglet Communauté (`components/community.tsx`) —
+  Mes clubs / Suggestions (`/api/clubs`, join/leave avec confirmation),
+  discussion = fil de commentaires du média (`/comments/[id]`), création via
+  modal listant ma bibliothèque (queries `/api/shows/library` +
+  `/api/movies/profile` réutilisées).
 
 ### 2026-07-20 (nuit) — Claude : onglet Communauté remplace Bibliothèque
 - **Décision équipe (Benjamin)** : Bibliothèque doublonnait le Profil (mêmes

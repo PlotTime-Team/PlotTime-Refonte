@@ -8,18 +8,20 @@ import { SegmentedFilter, TabHeader } from '@/components/prisme';
 import { EmptyState, Loading, LoadError } from '@/components/ui';
 import { FadeSwitch } from '@/components/anim';
 import { useTabResetSeq } from '@/lib/tabReset';
+import { ClubsTab, FriendsLovedCarousel, WeeklyChallengeCard } from '@/components/community';
 import { FeedTab, FriendsTab } from '../social';
 import { LeaderboardBoard, type Leaderboard } from '../stats/leaderboard';
 
 // Onglet Communauté (décision équipe 2026-07-20) : remplace l'ex-onglet
 // Bibliothèque (doublon du Profil). Regroupe le fil d'activité des
 // abonnements (épisodes vus, notes, badges débloqués), le classement entre
-// amis et la recherche de profils.
-type CommunityTab = 'feed' | 'ranking' | 'friends';
+// amis, la recherche de profils et les clubs par média.
+type CommunityTab = 'feed' | 'ranking' | 'friends' | 'clubs';
 const TAB_OPTIONS: { value: CommunityTab; label: string }[] = [
   { value: 'feed', label: 'Fil' },
   { value: 'ranking', label: 'Classement' },
   { value: 'friends', label: 'Amis' },
+  { value: 'clubs', label: 'Clubs' },
 ];
 
 export default function CommunityScreen() {
@@ -40,7 +42,15 @@ export default function CommunityScreen() {
         />
       </View>
       <FadeSwitch trigger={tab}>
-        {tab === 'feed' ? <FeedTab /> : tab === 'ranking' ? <RankingSection /> : <FriendsTab />}
+        {tab === 'feed' ? (
+          <FeedTab header={<FriendsLovedCarousel />} />
+        ) : tab === 'ranking' ? (
+          <RankingSection />
+        ) : tab === 'friends' ? (
+          <FriendsTab />
+        ) : (
+          <ClubsTab />
+        )}
       </FadeSwitch>
     </View>
   );
@@ -59,6 +69,7 @@ function RankingSection() {
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.rankingContent}>
+      <WeeklyChallengeCard />
       <SegmentedFilter
         options={[
           { value: 'series', label: 'Séries' },

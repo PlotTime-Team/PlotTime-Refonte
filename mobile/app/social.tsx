@@ -10,11 +10,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import { useDebounced } from '@/lib/useDebounced';
 import { COLORS, FONTS, RADIUS, SHADOW, SIZES, SPACE } from '@/lib/theme';
@@ -28,7 +28,11 @@ type PublicUser = {
   avatarUrl: string | null;
   isFollowing?: boolean;
   level?: number;
+  // Streak de visionnage : fourni par le fil et les listes following/followers
+  // (PAS par la recherche d'utilisateurs) — affichage conditionnel.
+  streak?: number;
 };
+type FeedReactions = { total: number; mine: string[]; counts: Record<string, number> };
 type FeedItem = {
   kind: 'watch' | 'comment' | 'badge';
   id: string;
@@ -39,7 +43,26 @@ type FeedItem = {
   episode?: { seasonNumber: number; episodeNumber: number; title: string } | null;
   body?: string;
   badge?: { id: string; label: string; tier: number };
+  reactions?: FeedReactions;
 };
+
+const FEED_KEY = ['social', 'feed'] as const;
+const HEART = '❤️';
+
+// Bascule locale du cœur sur un item du fil (miroir du toggle serveur) —
+// utilisée par la mise à jour optimiste du cache react-query.
+function toggleHeart(item: FeedItem): FeedItem {
+  const r = item.reactions ?? { total: 0, mine: [], counts: {} };
+  const liked = r.mine.includes(HEART);
+  return {
+    ...item,
+    reactions: {
+      total: Math.max(0, r.total + (liked ? -1 : 1)),
+      mine: liked ? r.mine.filter((e) => e !== HEART) : [...r.mine, HEART],
+      counts: { ...r.counts, [HEART]: Math.max(0, (r.counts[HEART] ?? 0) + (liked ? -1 : 1)) },
+    },
+  };
+}
 
 const TIER_LABELS: Record<number, string> = {
   1: 'bronze',
@@ -206,12 +229,43 @@ function Tab({
   );
 }
 
-// Exporté : réutilisé par l'onglet Communauté ((tabs)/community.tsx).
-export function FeedTab() {
+// Exporté : réutilisé par l'onglet Communauté ((tabs)/community.tsx), qui
+// peut injecter un en-tête de liste (carrousel « Tes amis ont adoré »).
+export function FeedTab({ header }: { header?: React.ReactElement }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['social', 'feed'],
+    queryKey: FEED_KEY,
     queryFn: () => api.get<{ items: FeedItem[] }>('/api/social/feed'),
+  });
+
+  // Toggle ❤️ : mise à jour OPTIMISTE du cache (bascule immédiate), rollback
+  // sur l'état précédent si le serveur refuse.
+  const react = useMutation({
+    mutationFn: (item: FeedItem) =>
+      api.post<{ reacted: boolean; count: number }>('/api/social/feed/react', {
+        kind: item.kind,
+        refId: item.id,
+        emoji: HEART,
+      }),
+    onMutate: async (item) => {
+      await queryClient.cancelQueries({ queryKey: FEED_KEY });
+      const previous = queryClient.getQueryData<{ items: FeedItem[] }>(FEED_KEY);
+      queryClient.setQueryData<{ items: FeedItem[] }>(FEED_KEY, (old) =>
+        old
+          ? {
+              ...old,
+              items: old.items.map((it) =>
+                it.kind === item.kind && it.id === item.id ? toggleHeart(it) : it,
+              ),
+            }
+          : old,
+      );
+      return { previous };
+    },
+    onError: (_error, _item, context) => {
+      if (context?.previous) queryClient.setQueryData(FEED_KEY, context.previous);
+    },
   });
 
   if (isLoading) return <Loading />;
@@ -238,6 +292,7 @@ export function FeedTab() {
           ) : null}
         </AppearItem>
       )}
+      ListHeaderComponent={header}
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}
@@ -265,27 +320,33 @@ export function FeedTab() {
       'palier ' + String(item.badge?.tier ?? '');
     return (
       <View style={styles.feedCard}>
-        <UserAvatar
-          user={item.user}
-          onPress={() => router.push(('/user/' + item.user.id) as Href)}
-        />
-        <View style={styles.feedCopy}>
-          <Text style={styles.feedText}>
-            <Text style={styles.feedName}>{item.user.displayName}</Text>
-            {' a débloqué '}
-            <Text style={styles.feedMedia}>{item.badge?.label}</Text>
-          </Text>
-          <View style={styles.metaRow}>
-            <View style={[styles.kindBadge, styles.kindBadgeTrophy]}>
-              <Feather name="award" size={12} color={COLORS.warning} />
-              <Text style={styles.kindBadgeText}>PALIER {tierLabel.toUpperCase()}</Text>
+        <View style={styles.feedCardMain}>
+          <UserAvatar
+            user={item.user}
+            onPress={() => router.push(('/user/' + item.user.id) as Href)}
+          />
+          <View style={styles.feedCopy}>
+            <Text style={styles.feedText}>
+              <Text style={styles.feedName}>{item.user.displayName}</Text>
+              {item.user.streak ? (
+                <Text style={styles.streakInline}>{' 🔥 ' + item.user.streak}</Text>
+              ) : null}
+              {' a débloqué '}
+              <Text style={styles.feedMedia}>{item.badge?.label}</Text>
+            </Text>
+            <View style={styles.metaRow}>
+              <View style={[styles.kindBadge, styles.kindBadgeTrophy]}>
+                <Feather name="award" size={12} color={COLORS.warning} />
+                <Text style={styles.kindBadgeText}>PALIER {tierLabel.toUpperCase()}</Text>
+              </View>
+              <Text style={styles.dateText}>{dateLabel(item.date)}</Text>
             </View>
-            <Text style={styles.dateText}>{dateLabel(item.date)}</Text>
+          </View>
+          <View style={styles.trophyOrb} accessible={false}>
+            <Feather name="award" size={23} color={COLORS.onAccent} />
           </View>
         </View>
-        <View style={styles.trophyOrb} accessible={false}>
-          <Feather name="award" size={23} color={COLORS.onAccent} />
-        </View>
+        <ReactionBar item={item} onToggle={(target) => react.mutate(target)} />
       </View>
     );
   }
@@ -295,6 +356,7 @@ export function FeedTab() {
     const poster = tmdbImage(media.posterPath, 'w185');
     return (
       <View style={styles.feedCard}>
+        <View style={styles.feedCardMain}>
         <UserAvatar
           user={item.user}
           onPress={() => router.push(('/user/' + item.user.id) as Href)}
@@ -310,6 +372,9 @@ export function FeedTab() {
         <View style={styles.feedCopy}>
           <Text style={styles.feedText}>
             <Text style={styles.feedName}>{item.user.displayName}</Text>
+            {item.user.streak ? (
+              <Text style={styles.streakInline}>{' 🔥 ' + item.user.streak}</Text>
+            ) : null}
             {' ' + actionText(item) + ' '}
             <Text style={styles.feedMedia}>{media.title}</Text>
           </Text>
@@ -359,9 +424,45 @@ export function FeedTab() {
           )}
         </View>
         </PressableScale>
+        </View>
+        <ReactionBar item={item} onToggle={(target) => react.mutate(target)} />
       </View>
     );
   }
+}
+
+// Pied de carte du fil : cœur (outline → plein teinté primaire quand j'ai
+// réagi) + total des réactions.
+function ReactionBar({
+  item,
+  onToggle,
+}: {
+  item: FeedItem;
+  onToggle: (item: FeedItem) => void;
+}) {
+  const reactions = item.reactions ?? { total: 0, mine: [], counts: {} };
+  const liked = reactions.mine.includes(HEART);
+  return (
+    <View style={styles.reactionRow}>
+      <Pressable
+        onPress={() => onToggle(item)}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={liked ? 'Ne plus aimer' : 'Aimer'}
+        accessibilityState={{ selected: liked }}
+        style={({ pressed }) => [styles.reactionButton, pressed && styles.pressed]}
+      >
+        <Ionicons
+          name={liked ? 'heart' : 'heart-outline'}
+          size={18}
+          color={liked ? COLORS.primary : COLORS.textMuted}
+        />
+        <Text style={[styles.reactionCount, liked && styles.reactionCountActive]}>
+          {reactions.total}
+        </Text>
+      </Pressable>
+    </View>
+  );
 }
 
 // Exporté : réutilisé par l'onglet Communauté ((tabs)/community.tsx).
@@ -382,6 +483,12 @@ export function FriendsTab() {
       ),
     enabled: dq.length > 1,
     placeholderData: keepPreviousData,
+  });
+  // Mes abonnements (le serveur fournit ici streak + niveau) : liste affichée
+  // quand aucune recherche n'est en cours, à la place de l'état vide.
+  const followingQuery = useQuery({
+    queryKey: ['social', 'following'],
+    queryFn: () => api.get<{ users: PublicUser[] }>('/api/social/following'),
   });
 
   const toggle = async (user: PublicUser) => {
@@ -407,6 +514,92 @@ export function FriendsTab() {
   };
 
   const users = search.data?.users ?? [];
+  const followedUsers = followingQuery.data?.users ?? [];
+
+  // Rangée utilisateur partagée entre la recherche et « Mes abonnements ».
+  // Streak/niveau ne sont affichés QUE si le serveur les fournit (listes
+  // following/followers) — jamais inventés sur les résultats de recherche.
+  const renderUserRow = (user: PublicUser, index: number) => {
+    const following = overrides[user.id] ?? user.isFollowing ?? false;
+    const rowBusy = busyId === user.id;
+    const statsLabel =
+      typeof user.streak === 'number'
+        ? [
+            user.streak > 0 ? '🔥 ' + user.streak : null,
+            user.level ? 'Nv. ' + user.level : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : '';
+    return (
+      <AppearItem index={index}>
+        <View style={styles.userCard}>
+          <Pressable
+            style={styles.userTap}
+            onPress={() => router.push(('/user/' + user.id) as Href)}
+            accessibilityRole="button"
+            accessibilityLabel={'Ouvrir le profil de ' + user.displayName}
+          >
+            <UserAvatar user={user} />
+            <View style={styles.userCopy}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {user.displayName}
+              </Text>
+              <Text style={styles.userHint}>
+                {statsLabel ||
+                  (following ? 'Déjà dans ta communauté' : 'Découvrir le profil')}
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.followButton,
+              following && styles.followingButton,
+              busyId !== null && styles.disabled,
+              pressed && busyId === null && styles.pressed,
+            ]}
+            onPress={() => void toggle(user)}
+            disabled={busyId !== null}
+            accessibilityRole="button"
+            accessibilityLabel={
+              following
+                ? 'Ne plus suivre ' + user.displayName
+                : 'Suivre ' + user.displayName
+            }
+            accessibilityState={{
+              busy: rowBusy,
+              disabled: busyId !== null,
+              selected: following,
+            }}
+          >
+            {rowBusy ? (
+              <ActivityIndicator
+                size="small"
+                color={following ? COLORS.text : COLORS.onPrimary}
+              />
+            ) : (
+              <>
+                <Feather
+                  name={following ? 'check' : 'plus'}
+                  size={15}
+                  color={following ? COLORS.text : COLORS.onPrimary}
+                />
+                <Text
+                  style={[
+                    styles.followButtonText,
+                    following && styles.followingButtonText,
+                  ]}
+                >
+                  {following ? 'SUIVI' : 'SUIVRE'}
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      </AppearItem>
+    );
+  };
+
   return (
     <View style={styles.friends}>
       <View style={styles.searchCard}>
@@ -450,12 +643,40 @@ export function FriendsTab() {
       ) : null}
 
       {q.trim().length <= 1 ? (
-        <View style={styles.flexState}>
-          <EmptyState
-            title="Trouve ta communauté"
-            message="Saisis au moins deux caractères pour rechercher un profil."
+        followedUsers.length > 0 ? (
+          <FlatList
+            data={followedUsers}
+            style={styles.list}
+            contentContainerStyle={styles.userListContent}
+            keyExtractor={(user) => user.id}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item: user, index }) => renderUserRow(user, index)}
+            ListHeaderComponent={
+              <Text style={styles.listLabel} accessibilityRole="header">
+                MES ABONNEMENTS
+              </Text>
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={followingQuery.isRefetching}
+                onRefresh={() => void followingQuery.refetch()}
+                tintColor={COLORS.primary}
+                colors={[COLORS.primary]}
+              />
+            }
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            showsVerticalScrollIndicator={false}
           />
-        </View>
+        ) : (
+          <View style={styles.flexState}>
+            <EmptyState
+              title="Trouve ta communauté"
+              message="Saisis au moins deux caractères pour rechercher un profil."
+            />
+          </View>
+        )
       ) : search.isLoading ? (
         <Loading />
       ) : search.isError && !search.data ? (
@@ -473,79 +694,7 @@ export function FriendsTab() {
           ]}
           keyExtractor={(user) => user.id}
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item: user, index }) => {
-            const following =
-              overrides[user.id] ?? user.isFollowing ?? false;
-            const rowBusy = busyId === user.id;
-            return (
-              <AppearItem index={index}>
-                <View style={styles.userCard}>
-                  <Pressable
-                    style={styles.userTap}
-                    onPress={() =>
-                      router.push(('/user/' + user.id) as Href)
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={'Ouvrir le profil de ' + user.displayName}
-                  >
-                    <UserAvatar user={user} />
-                    <View style={styles.userCopy}>
-                      <Text style={styles.userName} numberOfLines={1}>
-                        {user.displayName}
-                      </Text>
-                      <Text style={styles.userHint}>
-                        {following ? 'Déjà dans ta communauté' : 'Découvrir le profil'}
-                      </Text>
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.followButton,
-                      following && styles.followingButton,
-                      busyId !== null && styles.disabled,
-                      pressed && busyId === null && styles.pressed,
-                    ]}
-                    onPress={() => void toggle(user)}
-                    disabled={busyId !== null}
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      following
-                        ? 'Ne plus suivre ' + user.displayName
-                        : 'Suivre ' + user.displayName
-                    }
-                    accessibilityState={{
-                      busy: rowBusy,
-                      disabled: busyId !== null,
-                      selected: following,
-                    }}
-                  >
-                    {rowBusy ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={following ? COLORS.text : COLORS.onPrimary}
-                      />
-                    ) : (
-                      <>
-                        <Feather
-                          name={following ? 'check' : 'plus'}
-                          size={15}
-                          color={following ? COLORS.text : COLORS.onPrimary}
-                        />
-                        <Text
-                          style={[
-                            styles.followButtonText,
-                            following && styles.followingButtonText,
-                          ]}
-                        >
-                          {following ? 'SUIVI' : 'SUIVRE'}
-                        </Text>
-                      </>
-                    )}
-                  </Pressable>
-                </View>
-              </AppearItem>
-            );
-          }}
+          renderItem={({ item: user, index }) => renderUserRow(user, index)}
           ListEmptyComponent={
             <EmptyState
               title="Aucun utilisateur"
@@ -669,16 +818,52 @@ const styles = StyleSheet.create({
   },
   listContentEmpty: { flexGrow: 1, justifyContent: 'center' },
   feedCard: {
-    minHeight: 92,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACE.sm,
     padding: SPACE.md,
     borderRadius: RADIUS.card,
     borderWidth: 1,
     borderColor: COLORS.borderLight,
     backgroundColor: COLORS.surface,
     ...SHADOW.card,
+  },
+  feedCardMain: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.sm,
+  },
+  streakInline: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontFamily: FONTS.bold,
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACE.sm,
+    paddingTop: SPACE.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.borderLight,
+  },
+  reactionButton: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.xxs,
+    paddingHorizontal: SPACE.xs,
+    borderRadius: RADIUS.pill,
+  },
+  reactionCount: {
+    color: COLORS.textMuted,
+    fontSize: 12.5,
+    fontFamily: FONTS.bold,
+  },
+  reactionCountActive: { color: COLORS.primary },
+  listLabel: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontFamily: FONTS.extraBold,
+    letterSpacing: 0.8,
+    marginBottom: SPACE.xxs,
   },
   feedMainTap: { minWidth: 0, flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   avatar: {
