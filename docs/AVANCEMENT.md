@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-20** (Claude) — arbitrage Fable/Opus des lots 12-14 + déploiement préversion web `/prisme/`
+Dernière mise à jour : **2026-07-20** (Claude) — lots 12-14 basculés sur la version full-Prisme (arbitrage inversé à la demande d'Étienne) + préversion `/prisme/` redéployée
 
 ---
 
@@ -90,6 +90,18 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-20 (soir) — Claude : lots 12-14 → version full-Prisme (arbitrage inversé)
+- À la demande d'Étienne, la **base des lots 12-14 est désormais la version
+  full-Prisme** (`062de06`, ex-branche `claude/finish-prisme`) : ScreenShell/
+  ScreenHeader/SegmentedFilter/PrismeCard sur réglages, stats, badges,
+  leaderboard, trophées, profil (édition/couverture), import, comptes liés,
+  jeux. Greffe depuis la version précédente : **bouton retour des réglages**
+  (`goBack` avec fallback — c'était la cause du bug « retour » signalé).
+- Parité fonctionnelle vérifiée fichier par fichier (resync bibliothèque,
+  disclaimer TV Time/Whip, liaisons SSO, avatar/couverture, 18+ masqué iOS,
+  attributions TMDb/TheTVDB/IGDB, suppression de compte). Typecheck 0 erreur ;
+  préversion redéployée sur `/prisme/` (retour vérifié au clic, console propre).
 
 ### 2026-07-20 — Claude : arbitrage Fable/Opus des lots 12-14 + préversion web
 - **Arbitrage** (commit `60f685c`) : la version `main` (Fable) des lots 12-14 est
