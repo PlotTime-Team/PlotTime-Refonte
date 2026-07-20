@@ -91,6 +91,23 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 ## Journal des modifications
 
+### 2026-07-20 (nuit) — Claude : agenda en 3 segments + en-têtes compacts (retours Étienne)
+- **Agenda coupé en trois** (`200f793`) : segments Séries / Films / Jeux.
+  Séries = épisodes à venir (existant) ; Films = sorties des films de la liste
+  (`/api/movies` → `upcoming`, rangées affiche + date) ; Jeux = sorties des
+  jeux suivis (`/api/games/upcoming`, groupes par période).
+- **En-têtes d'onglets compacts** : nouveau `TabHeader` (titre seul, centré,
+  18 px) sur Accueil, Agenda, Explorer, Bibliothèque, Jeux, Films — suppression
+  des eyebrows/sous-titres (« Reprenez exactement là où vous en étiez »,
+  « INSPIRATIONS », « Trouvez votre prochaine histoire »…). Les écrans poussés
+  (réglages, stats…) gardent leur grand en-tête avec retour.
+- **Onglet Bibliothèque : PAS refondu** — décision d'équipe en attente.
+  Constat : c'est aujourd'hui un simple menu de liens + compteurs (double
+  navigation). Proposition Claude à trancher : en faire la vraie bibliothèque
+  (segments Séries / Films / Jeux affichant directement les collections,
+  favoris épinglés en tête) et retirer les écrans intermédiaires ; sinon le
+  supprimer et promouvoir Films/Jeux dans la tab bar. À valider par Étienne.
+
 ### 2026-07-20 (soir) — Claude : lots 12-14 → version full-Prisme (arbitrage inversé)
 - À la demande d'Étienne, la **base des lots 12-14 est désormais la version
   full-Prisme** (`062de06`, ex-branche `claude/finish-prisme`) : ScreenShell/
