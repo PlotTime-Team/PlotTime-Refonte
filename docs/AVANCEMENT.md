@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-21** (Claude/Étienne) — Explorer : barre de recherche flottante, fond du feed remontant en haut de l'écran, barre de progression supprimée
+Dernière mise à jour : **2026-07-21** (Claude/Étienne) — Explorer : cartes du feed peaufinées (libellé « Fiche », invite de dépliage cliquable, overlay détails opaque en Glass sans trait rose, bouton « Accéder à la fiche »)
 
 ---
 
@@ -90,6 +90,24 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-21 — Claude/Étienne : Explorer — cartes & overlay détails peaufinés
+- **Libellé « Fiche »** sous la vignette-affiche du rail d'actions
+  (`components/explore/ActionRail.tsx`) : signale que cette vignette ouvre la
+  fiche de l'œuvre, à l'image des autres actions (À voir, Déjà vu…).
+- **« Touchez pour déplier les détails » cliquable** (`TikTokCard.tsx`) :
+  l'invite était un simple texte dans la légende `box-none` → il interceptait
+  le tap sans le transmettre au fond (zone morte pile sur l'invite). Elle
+  devient un vrai bouton (hitSlop généreux) ; la bascule ouvre/ferme l'overlay.
+- **Overlay détails lisible en Glass** (`DescriptionOverlay.tsx`) : fond passé
+  de `surface` (voile translucide, l'affiche transparaissait) à `sheet`
+  (quasi opaque en Glass) — texte enfin lisible.
+- **Trait rose retiré** : la barrette d'accent (`sheetAccent`, couleur
+  secondaire) en haut du panneau est supprimée.
+- **Bouton d'accès à la fiche** : « VOIR LA FICHE » (+ icônes lien/flèche)
+  devient **« Accéder à la fiche »**, sans icône.
+- Validé en Chromium (thème Glass, feed simulé) ; `tsc --noEmit` + export web OK.
+
 
 ### 2026-07-21 — Claude/Étienne : Explorer — barre de recherche flottante + feed pleine hauteur
 - **Barre de recherche FLOTTANTE** (`mobile/app/(tabs)/explore.tsx`) : le
