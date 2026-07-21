@@ -74,11 +74,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
               accessibilityLabel={LABELS[route.name] ?? route.name}
               accessibilityState={{ selected: focused }}
             >
-              <TabIcon
-                name={ICONS[route.name] ?? 'circle'}
-                focused={focused}
-                showDot={route.name === 'explore' && !focused}
-              />
+              <TabIcon name={ICONS[route.name] ?? 'circle'} focused={focused} />
             </Pressable>
           );
         })}
@@ -87,7 +83,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
   );
 }
 
-function TabIcon({ name, focused, showDot }: { name: keyof typeof Feather.glyphMap; focused: boolean; showDot: boolean }) {
+function TabIcon({ name, focused }: { name: keyof typeof Feather.glyphMap; focused: boolean }) {
   const reduce = useReduceMotion();
   const scale = useRef(new Animated.Value(focused ? 1 : 0.92)).current;
   const color = focused ? COLORS.navActive : COLORS.textMuted;
@@ -110,7 +106,6 @@ function TabIcon({ name, focused, showDot }: { name: keyof typeof Feather.glyphM
         color={color}
         style={focused && THEME === 'glass' ? styles.iconGlow : undefined}
       />
-      {showDot ? <View style={styles.dot} /> : null}
     </Animated.View>
   );
 }
@@ -156,5 +151,4 @@ const styles = StyleSheet.create({
   itemPressed: { opacity: 0.72 },
   // Halo lumineux de l'icône active en Glass (lisibilité sur fond sombre).
   iconGlow: { textShadowColor: 'rgba(255,255,255,0.95)', textShadowRadius: 7, textShadowOffset: { width: 0, height: 0 } },
-  dot: { position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: COLORS.notif },
 });
