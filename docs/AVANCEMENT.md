@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-21** (Claude/Étienne) — Explorer : arrière-plan figé au scroll, affiche pleine hauteur (sous la recherche → au-dessus de la nav), icône de navigation active lisible en Glass
+Dernière mise à jour : **2026-07-21** (Claude/Étienne) — Paramètres épurés (un seul titre par section), boutons jaunes (héritage TV Time) remplacés par le violet PlotTime, bouton « Modifier » du profil réduit à l'icône
 
 ---
 
@@ -90,6 +90,20 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-21 — Claude/Étienne : Paramètres épurés + fin des boutons jaunes (héritage TV Time)
+- **Profil — bouton « Modifier »** (`mobile/app/(tabs)/profile.tsx`) : réduit à
+  l'icône stylo seule dans une bulle ronde (texte retiré).
+- **Paramètres — sections épurées** (`mobile/app/settings.tsx`) : chaque section
+  n'a plus qu'UN titre (l'eyebrow surtitre redondant est supprimé partout).
+- **Fin du jaune (héritage TV Time)** : tous les boutons jaunes passent au
+  violet `primary` (couleurs alignées sur la refonte Statistiques), texte/spinner
+  en `onPrimary` — RESYNCHRONISER MA BIBLIOTHÈQUE, IMPORTER MA BIBLIOTHÈQUE,
+  VIDER LE CACHE, SE DÉCONNECTER, et les boutons ENREGISTRER/RÉINITIALISER des
+  feuilles. L'interrupteur (toggle) passe aussi au violet (piste `primary`,
+  bouton blanc). « Supprimer le compte » reste en rouge (danger).
+- Validé en Chromium (thème Glass) ; `tsc --noEmit` + export web OK.
+
 
 ### 2026-07-21 — Claude/Étienne : Explorer — fond figé, affiche pleine hauteur, icône nav Glass
 - **Arrière-plan figé** (`components/explore/TikTokFeed.tsx` + `TikTokCard.tsx`) :
