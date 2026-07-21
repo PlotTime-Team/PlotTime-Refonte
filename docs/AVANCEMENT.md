@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-21** (Claude/Étienne) — resync globale des métadonnées (script one-shot serveur) pour nettoyer à la source les fiches (années aberrantes, données périmées), sans toucher aux affiches/personnalisations
+Dernière mise à jour : **2026-07-21** (Claude/Étienne) — Explorer : une seule carte par swipe (garde JS anti-inertie côté web + `disableIntervalMomentum` natif), le scroll rapide ne saute plus plusieurs cartes
 
 ---
 
@@ -91,6 +91,30 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-21 — Claude/Étienne : Explorer, une seule carte par swipe (fix scroll)
+- **Symptôme** (retour Étienne) : dans le feed TikTok de l'Explorer, un scroll
+  rapide/appuyé faisait défiler **plusieurs cartes d'un coup**, illisibles. Exigé :
+  une seule carte par swipe, quelle que soit la vitesse/force.
+- **Diagnostic** : `pagingEnabled` de React Native Web pose bien
+  `scroll-snap-type: y mandatory` + `scroll-snap-align: start`, mais **Chromium
+  ignore `scroll-snap-stop: always` pendant l'inertie** (reproduit en local : un
+  fling fort saute 5 cartes malgré la règle appliquée). RNW n'émet par ailleurs
+  **que `onScroll`** sur web (aucune phase drag/momentum).
+- **Correctif** — `mobile/components/explore/TikTokFeed.tsx` :
+  - **Natif** : `disableIntervalMomentum` (coupe le momentum au-delà d'une page).
+  - **Web** : garde JS « 1 carte ». Une *ancre* (carte de départ) est calée au
+    `touchStart` et à chaque stabilisation du défilement (débounce 140 ms) ; à
+    chaque `onScroll`, l'offset est borné à **±1 carte** autour de l'ancre — dès
+    que l'inertie dépasse la carte voisine, on la fige sur la frontière. Les
+    défilements programmatiques (avance, tirage, restauration de position,
+    changement de catégorie) neutralisent temporairement la garde (`markProgrammatic`).
+  - Règle `scroll-snap-stop: always` conservée (amélioration progressive là où le
+    moteur l'honore) via injection ciblée sur le sous-arbre du feed.
+- **Validation** : reproduction du fling fort dans le Chromium de Playwright
+  (gestes tactiles CDP avec inertie réelle) → **sans garde : 5 cartes/fling ;
+  avec garde : exactement 1 carte/fling, toutes alignées** sur une frontière de
+  carte. Typecheck mobile OK.
 
 ### 2026-07-21 — Claude/Étienne : export de données au format TV Time
 - **Objectif** (demande produit Étienne) : « se calquer sur le format de TV
