@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-21** (Claude/Étienne) — section « Contenu 18+ » retirée des Paramètres (partout, y compris web app)
+Dernière mise à jour : **2026-07-21** (Claude/Étienne) — icônes Android « dézoomées » : logo réduit sur les icônes maskable de la PWA (et l'adaptive icon native) pour laisser voir le bleu de marque sur l'écran d'accueil
 
 ---
 
@@ -90,6 +90,22 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-21 — Claude/Étienne : icônes Android « dézoomées » (plus de bleu de fond)
+- **Icônes maskable de la PWA** (`mobile/public/maskable-512.png` &
+  `maskable-192.png`) : le logo passe de ~53 % à **~42 %** du canvas sur fond
+  bleu plein. Le lanceur Android (Samsung One UI) « zoome » les icônes maskable
+  via la zone de sécurité ; avec plus de marge, le bleu de marque redevient
+  visible autour du logo sur l'écran d'accueil (cf. retour PJ). L'icône `any`
+  (`icon-*`, vue dans le multitâche) est inchangée.
+- **Adaptive icon native** (`assets/branding/android-adaptive-foreground-1024.png`
+  + `android-monochrome-1024.png`) : logo réduit de 58 % à **45 %** pour le même
+  effet sur un build natif (EAS).
+- ⚠️ Prise en compte : re-export web (Benjamin) pour la PWA ; l'icône d'une PWA
+  DÉJÀ installée est mise en cache par Android → il faut la retirer puis la
+  réajouter à l'écran d'accueil pour voir la nouvelle icône. L'adaptive native
+  ne change qu'au prochain build natif.
+
 
 ### 2026-07-21 — Claude/Étienne : retrait total de la section « Contenu 18+ »
 - **Section « Suggestions / Contenu 18+ » supprimée** de Paramètres > Application
