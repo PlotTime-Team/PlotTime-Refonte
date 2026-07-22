@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-22** (Codex/Étienne) — modale Temps de jeu compactée et adaptée au clavier mobile
+Dernière mise à jour : **2026-07-22** (Codex/Étienne) — résumé des statistiques du Profil rendu lisible et responsive
 
 ---
 
@@ -91,6 +91,21 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-22 — Codex/Étienne : statistiques du Profil clarifiées
+- **Hiérarchie remaniée** (`mobile/app/(tabs)/profile.tsx`) : les six tuiles
+  isolées sont remplacées par une surface unique organisée en trois lignes —
+  Épisodes, Films et Jeux — qui rapproche pour chaque univers le total et son
+  temps associé sans changer les données ni la navigation vers le détail.
+- **Durées toujours lisibles** : mois, jours et heures sont rendus comme des
+  unités indépendantes et peuvent se réorganiser sur un écran étroit ; aucune
+  valeur n'est désormais coupée par des points de suspension.
+- **Casse harmonisée** : majuscule initiale sur les compteurs sociaux et tous
+  les libellés du résumé (`Abonnements`, `Épisodes`, `Vus`, `Temps de
+  visionnage`, `Joués`, `Temps déclaré`, etc.).
+- **QA** : typecheck mobile et export Expo Web réussis (41 routes) ; test
+  Playwright avec les valeurs longues du cas signalé à 320 × 844 et 390 × 844,
+  sans débordement horizontal, troncature ni erreur d'exécution.
 
 ### 2026-07-22 — Codex/Étienne : modale Temps de jeu adaptée au clavier
 - **Adaptation native** (`mobile/app/game/[id].tsx`) : la modale utilise désormais
