@@ -138,6 +138,23 @@ Retour Étienne sur les fiches de jeux vidéo (`mobile/app/game/[id].tsx`) :
 - **Validation** : typecheck mobile OK ; rendu Playwright de la fiche jeu (suivie
   et non suivie) confirmant la carte unique sans titre et la bannière au seul nom.
 
+### 2026-07-22 — Codex/Étienne : modale Temps de jeu adaptée au clavier
+- **Adaptation native** (`mobile/app/game/[id].tsx`) : la modale utilise désormais
+  `KeyboardAvoidingView` (`padding` sur iOS, `height` sur Android) et les safe
+  areas pour se recentrer dans l'espace réellement disponible au-dessus de
+  l'IME. L'autofocus est retiré : le clavier ne s'impose plus à l'ouverture.
+- **Densité réduite** : texte ramené à « Indique tes heures. Tu pourras les
+  modifier. », icône et espacements compactés, champ à 48 dp et actions
+  secondaires « Plus tard » / « Effacer » réunies sur une rangée de cibles
+  tactiles de 44 dp. Toutes les actions existantes restent disponibles.
+- **Structure web assainie** : le fond cliquable est séparé de la carte afin
+  d'éliminer les boutons HTML imbriqués tout en conservant la fermeture par
+  toucher extérieur et l'échappement d'accessibilité.
+- **QA** : typecheck mobile et export Expo Web réussis (41 routes) ; smoke test
+  Playwright à 390 × 844 puis 390 × 500 (zone réduite type clavier) : carte de
+  298 dp entièrement visible, trois actions accessibles, aucun débordement,
+  avertissement d'hydratation ou erreur d'exécution.
+
 ### 2026-07-22 — Codex/Étienne : contenus suivis en tête des résultats Explorer
 - **Recherche médias et jeux** (`mobile/app/(tabs)/explore.tsx`) : partition
   stable des résultats en deux groupes — contenus déjà présents dans la
