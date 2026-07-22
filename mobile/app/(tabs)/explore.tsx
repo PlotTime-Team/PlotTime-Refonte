@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,11 +19,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import { useDebounced } from '@/lib/useDebounced';
+import { useBackClose } from '@/lib/useBackClose';
+import { useAppStore } from '@/lib/store';
 import { COLORS, FONTS, RADIUS, SHADOW, SIZES, SPACE } from '@/lib/theme';
 import { EmptyState, LoadError } from '@/components/ui';
 import { AppearItem, FadeSwitch, PopIn, Skeleton } from '@/components/anim';
 import { useTabResetSeq } from '@/lib/tabReset';
 import { TikTokFeed } from '@/components/explore/TikTokFeed';
+import { FilterFab, SearchFilterSheet, type FilterOption } from '@/components/explore/SearchFilters';
 
 type FeedItem = {
   id: string | null;
@@ -50,6 +53,10 @@ type GameSearchResultDto = {
   year: number | null;
   posterPath: string | null;
   inLibrary?: boolean;
+  // Exposés pour le tri (note/popularité) et le filtre par plateforme.
+  voteAverage?: number | null;
+  voteCount?: number | null;
+  platforms?: string[];
 };
 
 export default function ExploreScreen() {
@@ -63,29 +70,48 @@ function ExploreScreenInner() {
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
-  const [tab, setTab] = useState<'media' | 'users' | 'games'>('media');
+  // Type de recherche PERSISTÉ (retour Étienne) : on revient sur le dernier type
+  // choisi (médias / jeux / profils) — pas de reset systématique sur « médias ».
+  const tab = useAppStore((s) => s.searchType);
+  const setTab = useAppStore((s) => s.setSearchType);
+  // Recherche OUVERTE : overlay affiché (sélecteur + résultats) dès le focus de
+  // la barre, et jusqu'à un « retour ». Découplé de la saisie (le sélecteur
+  // s'affiche donc immédiatement, avant même de taper).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   // Hauteur mesurée de la barre de recherche FLOTTANTE : le feed passe derrière
   // elle (fond pleine hauteur), on décale d'autant les chips et les résultats.
   const [headerHeight, setHeaderHeight] = useState(0);
   // Debounce : une requête quand l'utilisateur marque une pause, pas à chaque frappe.
   const debouncedQuery = useDebounced(query.trim(), 300);
 
-  const searching = query.trim().length > 1;
+  const searching = debouncedQuery.length > 1;
   const compact = width < 420;
-  // En-tête « actif » (agrandi) : champ focalisé OU saisie en cours.
-  const headerActive = focused || query.length > 0;
-  const cancel = () => {
+  const headerActive = searchOpen || focused || query.length > 0;
+
+  // Croix : efface le texte SANS fermer la recherche (on reste sur l'écran,
+  // champ re-focalisé pour enchaîner une autre recherche).
+  const clearQuery = () => {
     setQuery('');
-    setTab('media');
+    inputRef.current?.focus();
+  };
+  // Fermeture réelle (bouton « retour » système) : vide et revient au feed.
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQuery('');
+    setFocused(false);
     Keyboard.dismiss();
   };
+  // Le « retour » (précédent navigateur / back Android) ferme la recherche au
+  // lieu de quitter l'onglet Explorer (sinon on repartait vers l'Accueil).
+  useBackClose(searchOpen, closeSearch);
 
   return (
     <View style={styles.screen}>
       {/* Le feed (et les résultats) occupent TOUT l'écran : leur fond remonte
           derrière la barre de recherche flottante posée par-dessus (ci-dessous). */}
-      <FadeSwitch trigger={searching ? 'search' : 'feed'} style={styles.mode}>
-        {searching ? (
+      <FadeSwitch trigger={searchOpen ? 'search' : 'feed'} style={styles.mode}>
+        {searchOpen ? (
           <View style={[styles.resultsFrame, { paddingTop: headerHeight }]}>
             <View style={styles.tabs}>
               <SearchTab
@@ -102,15 +128,28 @@ function ExploreScreenInner() {
                 onPress={() => setTab('users')}
               />
             </View>
-            <FadeSwitch trigger={tab}>
-              {tab === 'media' ? (
-                <MediaResults query={debouncedQuery} rawQuery={query} />
-              ) : tab === 'games' ? (
-                <GameResults query={debouncedQuery} rawQuery={query} />
-              ) : (
-                <UserResults query={debouncedQuery} />
-              )}
-            </FadeSwitch>
+            {!searching ? (
+              <EmptyState
+                title="Que cherchez-vous ?"
+                message={
+                  tab === 'games'
+                    ? 'Tapez le nom d’un jeu à suivre.'
+                    : tab === 'users'
+                      ? 'Tapez le nom d’un profil à retrouver.'
+                      : 'Tapez le nom d’une série ou d’un film.'
+                }
+              />
+            ) : (
+              <FadeSwitch trigger={tab}>
+                {tab === 'media' ? (
+                  <MediaResults query={debouncedQuery} rawQuery={query} />
+                ) : tab === 'games' ? (
+                  <GameResults query={debouncedQuery} rawQuery={query} />
+                ) : (
+                  <UserResults query={debouncedQuery} />
+                )}
+              </FadeSwitch>
+            )}
           </View>
         ) : (
           <View style={styles.feedFrame}>
@@ -134,12 +173,13 @@ function ExploreScreenInner() {
               <Feather name="search" size={headerActive ? 18 : 15} color={focused ? COLORS.onPrimary : COLORS.primary} />
             </View>
             <TextInput
+              ref={inputRef}
               style={[styles.input, !headerActive && styles.inputCompact, Platform.OS === 'web' && ({ outlineStyle: 'none' } as never)]}
               placeholder="Séries, films, jeux, profils…"
               placeholderTextColor={COLORS.textMuted}
               value={query}
               onChangeText={setQuery}
-              onFocus={() => setFocused(true)}
+              onFocus={() => { setFocused(true); setSearchOpen(true); }}
               onBlur={() => setFocused(false)}
               autoCapitalize="none"
               autoCorrect={false}
@@ -149,7 +189,7 @@ function ExploreScreenInner() {
             {query ? (
               <Pressable
                 style={({ pressed }) => [styles.cancel, pressed && styles.cancelPressed]}
-                onPress={cancel}
+                onPress={clearQuery}
                 accessibilityRole="button"
                 accessibilityLabel="Effacer la recherche"
               >
@@ -210,15 +250,39 @@ function SearchResultsSkeleton() {
   );
 }
 
+// --- Filtres résultats séries/films : tri + type (série / film) --------------
+type MediaSort = 'relevance' | 'recent' | 'alpha';
+type MediaTypeFilter = 'all' | 'show' | 'movie';
+const MEDIA_SORT_OPTS: FilterOption[] = [
+  { key: 'relevance', label: 'Pertinence' },
+  { key: 'recent', label: 'Plus récents' },
+  { key: 'alpha', label: 'A → Z' },
+];
+const MEDIA_TYPE_OPTS: FilterOption[] = [
+  { key: 'all', label: 'Séries et films' },
+  { key: 'show', label: 'Séries seulement' },
+  { key: 'movie', label: 'Films seulement' },
+];
+function applyMediaFilter(items: FeedItem[], sort: MediaSort, type: MediaTypeFilter): FeedItem[] {
+  const arr = type === 'all' ? items.slice() : items.filter((r) => r.type === type);
+  if (sort === 'recent') arr.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+  else if (sort === 'alpha') arr.sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  return arr; // 'relevance' = ordre renvoyé par le serveur
+}
+
 // --- Résultats séries / films (façon TV Time) -------------------------------
 // Taper une ligne OUVRE la fiche (sans rien ajouter) ; seul le bouton + suit
 // la série (statut « Pas commencé ») ou ajoute le film à la watchlist.
 function MediaResults({ query, rawQuery }: { query: string; rawQuery: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [openingKey, setOpeningKey] = useState<string | null>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const [followed, setFollowed] = useState<Record<string, boolean>>({});
+  const [sheet, setSheet] = useState(false);
+  const [sort, setSort] = useState<MediaSort>('relevance');
+  const [typeFilter, setTypeFilter] = useState<MediaTypeFilter>('all');
 
   const search = useQuery({
     queryKey: ['search', query],
@@ -295,75 +359,116 @@ function MediaResults({ query, rawQuery }: { query: string; rawQuery: string }) 
     return <EmptyState title="Aucun résultat" message={`Aucune série ni aucun film ne correspond à « ${rawQuery.trim()} ».`} />;
   }
 
+  const shown = applyMediaFilter(results, sort, typeFilter);
+  const filtersActive = sort !== 'relevance' || typeFilter !== 'all';
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.resultsContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      {results.map((r, i) => {
-        const key = `${r.type}-${r.id ?? r.tvdbId ?? r.tmdbId}`;
-        const poster = tmdbImage(r.posterPath, 'w185');
-        const isFollowed = followed[key] || r.inLibrary;
-        return (
-          <AppearItem key={key} index={i}>
-            <Pressable
-              style={({ pressed }) => [styles.resultRow, pressed && styles.resultRowPressed]}
-              onPress={() => open(r, key)}
-              accessibilityRole="button"
-              accessibilityLabel={`Ouvrir la fiche de ${r.title}`}
-            >
-              {poster ? (
-                <Image source={{ uri: poster }} style={styles.resultPoster} resizeMode="cover" accessible={false} />
-              ) : (
-                <View style={[styles.resultPoster, styles.posterEmpty]} accessible={false}>
-                  <Feather name="image" size={20} color={COLORS.textSoft} />
-                </View>
-              )}
-              <View style={styles.resultBody}>
-                <Text style={styles.resultTitle} numberOfLines={2}>
-                  {r.title}
-                </Text>
-                <View style={styles.resultMetaRow}>
-                  <Feather name={r.type === 'show' ? 'tv' : 'film'} size={14} color={COLORS.primary} />
-                  <Text style={styles.resultMeta}>
-                    {[r.category === 'anime' ? 'Animé' : r.type === 'show' ? 'Série' : 'Film', r.year]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                </View>
-              </View>
-              {openingKey === key || addingKey === key ? (
-                <View style={styles.addSquareGhost} accessibilityLabel="Action en cours">
-                  <ActivityIndicator color={COLORS.primary} size="small" />
-                </View>
-              ) : isFollowed ? (
-                <View accessible accessibilityLabel="Déjà dans votre bibliothèque">
-                  <PopIn style={styles.addedSquare}>
-                    <Feather name="check" size={20} color={COLORS.onPrimary} />
-                  </PopIn>
-                </View>
-              ) : (
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={styles.resultsContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {shown.length === 0 ? (
+          <View style={styles.filterEmpty}>
+            <EmptyState title="Aucun résultat pour ce filtre" message="Élargissez le tri ou le type pour retrouver les autres résultats." />
+          </View>
+        ) : (
+          shown.map((r, i) => {
+            const key = `${r.type}-${r.id ?? r.tvdbId ?? r.tmdbId}`;
+            const poster = tmdbImage(r.posterPath, 'w185');
+            const isFollowed = followed[key] || r.inLibrary;
+            return (
+              <AppearItem key={key} index={i}>
                 <Pressable
-                  style={({ pressed }) => [styles.addSquare, pressed && styles.addSquarePressed]}
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    void add(r, key);
-                  }}
+                  style={({ pressed }) => [styles.resultRow, pressed && styles.resultRowPressed]}
+                  onPress={() => open(r, key)}
                   accessibilityRole="button"
-                  accessibilityLabel={
-                    r.type === 'movie' ? `Ajouter ${r.title} à voir` : `Suivre ${r.title}`
-                  }
+                  accessibilityLabel={`Ouvrir la fiche de ${r.title}`}
                 >
-                  <Feather name="plus" size={20} color={COLORS.onPrimary} />
+                  {poster ? (
+                    <Image source={{ uri: poster }} style={styles.resultPoster} resizeMode="cover" accessible={false} />
+                  ) : (
+                    <View style={[styles.resultPoster, styles.posterEmpty]} accessible={false}>
+                      <Feather name="image" size={20} color={COLORS.textSoft} />
+                    </View>
+                  )}
+                  <View style={styles.resultBody}>
+                    <Text style={styles.resultTitle} numberOfLines={2}>
+                      {r.title}
+                    </Text>
+                    <View style={styles.resultMetaRow}>
+                      <Feather name={r.type === 'show' ? 'tv' : 'film'} size={14} color={COLORS.primary} />
+                      <Text style={styles.resultMeta}>
+                        {[r.category === 'anime' ? 'Animé' : r.type === 'show' ? 'Série' : 'Film', r.year]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    </View>
+                  </View>
+                  {openingKey === key || addingKey === key ? (
+                    <View style={styles.addSquareGhost} accessibilityLabel="Action en cours">
+                      <ActivityIndicator color={COLORS.primary} size="small" />
+                    </View>
+                  ) : isFollowed ? (
+                    <View accessible accessibilityLabel="Déjà dans votre bibliothèque">
+                      <PopIn style={styles.addedSquare}>
+                        <Feather name="check" size={20} color={COLORS.onPrimary} />
+                      </PopIn>
+                    </View>
+                  ) : (
+                    <Pressable
+                      style={({ pressed }) => [styles.addSquare, pressed && styles.addSquarePressed]}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        void add(r, key);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        r.type === 'movie' ? `Ajouter ${r.title} à voir` : `Suivre ${r.title}`
+                      }
+                    >
+                      <Feather name="plus" size={20} color={COLORS.onPrimary} />
+                    </Pressable>
+                  )}
                 </Pressable>
-              )}
-            </Pressable>
-          </AppearItem>
-        );
-      })}
-    </ScrollView>
+              </AppearItem>
+            );
+          })
+        )}
+      </ScrollView>
+      <FilterFab active={filtersActive} onPress={() => setSheet(true)} bottom={insets.bottom + 58 + SPACE.sm} />
+      <SearchFilterSheet
+        visible={sheet}
+        onClose={() => setSheet(false)}
+        title="Trier & filtrer"
+        subtitle="Séries et films"
+        sortOptions={MEDIA_SORT_OPTS}
+        sort={sort}
+        filterTitle="Type"
+        filterOptions={MEDIA_TYPE_OPTS}
+        filter={typeFilter}
+        reset={{ sort: 'relevance', filter: 'all' }}
+        onApply={(s, f) => { setSort(s as MediaSort); setTypeFilter(f as MediaTypeFilter); setSheet(false); }}
+      />
+    </View>
   );
+}
+
+// --- Filtres résultats jeux : tri (popularité/note…) + plateforme ------------
+type GameSort = 'popular' | 'rating' | 'recent' | 'alpha';
+const GAME_SORT_OPTS: FilterOption[] = [
+  { key: 'popular', label: 'Populaires' },
+  { key: 'rating', label: 'Mieux notés' },
+  { key: 'recent', label: 'Plus récents' },
+  { key: 'alpha', label: 'A → Z' },
+];
+function applyGameFilter(items: GameSearchResultDto[], sort: GameSort, platform: string): GameSearchResultDto[] {
+  const arr = platform === 'all' ? items.slice() : items.filter((r) => (r.platforms ?? []).includes(platform));
+  if (sort === 'rating') arr.sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0));
+  else if (sort === 'recent') arr.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+  else if (sort === 'alpha') arr.sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  return arr; // 'popular' = ordre renvoyé par le serveur (par popularité)
 }
 
 // --- Résultats jeux (onglet JEUX, façon TV Time) -----------------------------
@@ -372,9 +477,13 @@ function MediaResults({ query, rawQuery }: { query: string; rawQuery: string }) 
 function GameResults({ query, rawQuery }: { query: string; rawQuery: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [openingKey, setOpeningKey] = useState<string | null>(null);
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const [followed, setFollowed] = useState<Record<string, boolean>>({});
+  const [sheet, setSheet] = useState(false);
+  const [sort, setSort] = useState<GameSort>('popular');
+  const [platform, setPlatform] = useState<string>('all');
 
   const search = useQuery({
     queryKey: ['games', 'search', query],
@@ -428,68 +537,104 @@ function GameResults({ query, rawQuery }: { query: string; rawQuery: string }) {
     return <EmptyState title="Aucun résultat" message={`Aucun jeu ne correspond à « ${rawQuery.trim()} ».`} />;
   }
 
+  // Plateformes proposées au filtre : celles PRÉSENTES dans les résultats.
+  const platformOpts: FilterOption[] = [
+    { key: 'all', label: 'Toutes les plateformes' },
+    ...Array.from(new Set(results.flatMap((r) => r.platforms ?? [])))
+      .sort((a, b) => a.localeCompare(b, 'fr'))
+      .map((p) => ({ key: p, label: p })),
+  ];
+  const shown = applyGameFilter(results, sort, platform);
+  const filtersActive = sort !== 'popular' || platform !== 'all';
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.resultsContent}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      {results.map((r, i) => {
-        const poster = tmdbImage(r.posterPath, 'w185');
-        const key = keyOf(r);
-        const isFollowed = followed[key] || r.inLibrary;
-        return (
-          <AppearItem key={key} index={i}>
-            <Pressable
-              style={({ pressed }) => [styles.resultRow, pressed && styles.resultRowPressed]}
-              onPress={() => open(r)}
-              accessibilityRole="button"
-              accessibilityLabel={`Ouvrir la fiche de ${r.title}`}
-            >
-              {poster ? (
-                <Image source={{ uri: poster }} style={styles.resultPoster} resizeMode="cover" accessible={false} />
-              ) : (
-                <View style={[styles.resultPoster, styles.posterEmpty]} accessible={false}>
-                  <Feather name="image" size={20} color={COLORS.textSoft} />
-                </View>
-              )}
-              <View style={styles.resultBody}>
-                <Text style={styles.resultTitle} numberOfLines={2}>
-                  {r.title}
-                </Text>
-                <View style={styles.resultMetaRow}>
-                  <Ionicons name="game-controller" size={14} color={COLORS.primary} />
-                  <Text style={styles.resultMeta}>{['Jeu', r.year].filter(Boolean).join(' · ')}</Text>
-                </View>
-              </View>
-              {openingKey === key || addingKey === key ? (
-                <View style={styles.addSquareGhost} accessibilityLabel="Action en cours">
-                  <ActivityIndicator color={COLORS.primary} size="small" />
-                </View>
-              ) : isFollowed ? (
-                <View accessible accessibilityLabel="Déjà dans votre bibliothèque">
-                  <PopIn style={styles.addedSquare}>
-                    <Feather name="check" size={20} color={COLORS.onPrimary} />
-                  </PopIn>
-                </View>
-              ) : (
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={styles.resultsContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {shown.length === 0 ? (
+          <View style={styles.filterEmpty}>
+            <EmptyState title="Aucun jeu pour ce filtre" message="Changez de plateforme ou de tri pour voir les autres jeux." />
+          </View>
+        ) : (
+          shown.map((r, i) => {
+            const poster = tmdbImage(r.posterPath, 'w185');
+            const key = keyOf(r);
+            const isFollowed = followed[key] || r.inLibrary;
+            return (
+              <AppearItem key={key} index={i}>
                 <Pressable
-                  style={({ pressed }) => [styles.addSquare, pressed && styles.addSquarePressed]}
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    void add(r);
-                  }}
+                  style={({ pressed }) => [styles.resultRow, pressed && styles.resultRowPressed]}
+                  onPress={() => open(r)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Ajouter ${r.title} aux jeux voulus`}
+                  accessibilityLabel={`Ouvrir la fiche de ${r.title}`}
                 >
-                  <Feather name="plus" size={20} color={COLORS.onPrimary} />
+                  {poster ? (
+                    <Image source={{ uri: poster }} style={styles.resultPoster} resizeMode="cover" accessible={false} />
+                  ) : (
+                    <View style={[styles.resultPoster, styles.posterEmpty]} accessible={false}>
+                      <Feather name="image" size={20} color={COLORS.textSoft} />
+                    </View>
+                  )}
+                  <View style={styles.resultBody}>
+                    <Text style={styles.resultTitle} numberOfLines={2}>
+                      {r.title}
+                    </Text>
+                    <View style={styles.resultMetaRow}>
+                      <Ionicons name="game-controller" size={14} color={COLORS.primary} />
+                      <Text style={styles.resultMeta} numberOfLines={1}>
+                        {['Jeu', r.year, r.platforms && r.platforms.length ? r.platforms.slice(0, 2).join(', ') : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    </View>
+                  </View>
+                  {openingKey === key || addingKey === key ? (
+                    <View style={styles.addSquareGhost} accessibilityLabel="Action en cours">
+                      <ActivityIndicator color={COLORS.primary} size="small" />
+                    </View>
+                  ) : isFollowed ? (
+                    <View accessible accessibilityLabel="Déjà dans votre bibliothèque">
+                      <PopIn style={styles.addedSquare}>
+                        <Feather name="check" size={20} color={COLORS.onPrimary} />
+                      </PopIn>
+                    </View>
+                  ) : (
+                    <Pressable
+                      style={({ pressed }) => [styles.addSquare, pressed && styles.addSquarePressed]}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        void add(r);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ajouter ${r.title} aux jeux voulus`}
+                    >
+                      <Feather name="plus" size={20} color={COLORS.onPrimary} />
+                    </Pressable>
+                  )}
                 </Pressable>
-              )}
-            </Pressable>
-          </AppearItem>
-        );
-      })}
-    </ScrollView>
+              </AppearItem>
+            );
+          })
+        )}
+      </ScrollView>
+      <FilterFab active={filtersActive} onPress={() => setSheet(true)} bottom={insets.bottom + 58 + SPACE.sm} />
+      <SearchFilterSheet
+        visible={sheet}
+        onClose={() => setSheet(false)}
+        title="Trier & filtrer"
+        subtitle="Jeux"
+        sortOptions={GAME_SORT_OPTS}
+        sort={sort}
+        filterTitle="Plateforme"
+        filterOptions={platformOpts}
+        filter={platform}
+        reset={{ sort: 'popular', filter: 'all' }}
+        onApply={(s, f) => { setSort(s as GameSort); setPlatform(f); setSheet(false); }}
+      />
+    </View>
   );
 }
 
@@ -713,8 +858,10 @@ const styles = StyleSheet.create({
     gap: SPACE.sm,
     paddingHorizontal: SPACE.md,
     paddingTop: SPACE.md,
-    paddingBottom: SPACE.xl,
+    // Dégage la barre de navigation flottante + la pilule « FILTRER ».
+    paddingBottom: SIZES.tabBar + SPACE.xxl,
   },
+  filterEmpty: { paddingTop: SPACE.xl },
   resultRow: {
     minHeight: 112,
     flexDirection: 'row',

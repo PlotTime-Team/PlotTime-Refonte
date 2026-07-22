@@ -6,7 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
-Dernière mise à jour : **2026-07-21** (Claude/Étienne) — coche « ajouté » recherche (verte pleine) + bascule vue cartes / grille d'affiches dans Accueil et Agenda (3 sous-onglets, réglage indépendant par onglet)
+Dernière mise à jour : **2026-07-21** (Claude/Étienne) — refonte recherche Explorer : type mémorisé, sélecteur au focus, croix qui n'efface que le texte, retour qui ferme la recherche, résultats jeux triés par popularité + exhaustifs, et filtre/tri des résultats (médias & jeux)
 
 ---
 
@@ -91,6 +91,31 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-21 — Claude/Étienne : refonte de la recherche Explorer (UX + tri/filtre jeux)
+Plusieurs retours Étienne sur l'onglet Explorer :
+- **Dernier type mémorisé** : la recherche revenait toujours sur « médias ». Le
+  type (médias / jeux / profils) est désormais **persisté** (`searchType` dans le
+  store) → on reste sur « Jeux » pour en ajouter plusieurs à la suite.
+- **Sélecteur dès le focus** : le sélecteur de type s'affiche **au clic** sur la
+  barre (avant même de taper), plus seulement après saisie.
+- **Croix = effacer seulement** : la croix vide le champ et **reste** sur l'écran
+  de recherche (champ re-focalisé), au lieu de refermer vers le feed.
+- **Retour arrière** : sur l'écran de recherche, le « précédent » ferme la barre
+  et revient au feed TikTok (via `useBackClose`) au lieu de repartir sur l'Accueil.
+- **Recherche jeux — ordre & exhaustivité** (serveur) : `igdbSearch` fusionne
+  toujours la requête « nom contient » (joker, limite 120) → **tous** les jeux
+  dont le nom contient le terme remontent (ex. « Mario ») ; résultats triés
+  **notés d'abord, par popularité (nb de notes) puis note** — fini l'ordre
+  aléatoire. La recherche expose désormais `voteAverage`/`voteCount`/`platforms`.
+- **Filtre des résultats** (`components/explore/SearchFilters.tsx`, design des
+  filtres de bibliothèque) : pilule « FILTRER » + feuille tri + filtre.
+  Médias = tri (Pertinence / Plus récents / A→Z) + type (Séries / Films) ;
+  Jeux = tri (Populaires / Mieux notés / Plus récents / A→Z) + plateforme
+  (liste dynamique issue des résultats).
+- **Validation** : tests serveur (290, dont un nouveau sur l'ordre de la
+  recherche jeux) ; rendu Playwright des flux (sélecteur au focus, ordre jeux,
+  feuilles de filtre médias & jeux, croix qui reste, retour qui ferme). Typecheck OK.
 
 ### 2026-07-21 — Claude/Étienne : coche « ajouté » recherche + vue grille d'affiches (Accueil/Agenda)
 - **Coche recherche** (`mobile/app/(tabs)/explore.tsx`) : quand un résultat est
