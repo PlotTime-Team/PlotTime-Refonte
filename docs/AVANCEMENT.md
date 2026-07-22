@@ -109,6 +109,19 @@ Retour Étienne sur les fiches de jeux vidéo (`mobile/app/game/[id].tsx`) :
 - **Validation** : typecheck mobile OK ; rendu Playwright de la fiche jeu (suivie
   et non suivie) confirmant la carte unique sans titre et la bannière au seul nom.
 
+### 2026-07-22 — Codex/Étienne : contenus suivis en tête des résultats Explorer
+- **Recherche médias et jeux** (`mobile/app/(tabs)/explore.tsx`) : partition
+  stable des résultats en deux groupes — contenus déjà présents dans la
+  bibliothèque ou ajoutés pendant la recherche en premier, autres résultats
+  ensuite. L'ordre de pertinence renvoyé par l'API reste inchangé à l'intérieur
+  de chaque groupe.
+- **Interaction immédiate** : après succès du bouton `+`, la série, le film ou
+  le jeu remonte sans rechargement au sommet du groupe suivi grâce à l'état
+  local déjà utilisé pour afficher la coche.
+- **QA** : typecheck mobile réussi ; export Expo Web réussi (41 routes) ; test
+  Playwright mobile 390 px validant l'ordre initial puis le réordonnancement
+  après ajout d'un film, d'une série et d'un jeu, sans débordement horizontal.
+
 ### 2026-07-22 — Codex/Étienne : notifications allégées et manette dans Recherche
 - **Notifications** (`mobile/app/notifications.tsx`) : retrait de la carte
   introductive « Centre d'activité / Ce qui vient de se passer » afin d'afficher

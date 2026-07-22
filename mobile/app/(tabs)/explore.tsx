@@ -274,6 +274,21 @@ function applyMediaFilter(items: FeedItem[], sort: MediaSort, type: MediaTypeFil
   return arr; // 'relevance' = ordre renvoyé par le serveur
 }
 
+// Clé stable d'un résultat média (série/film) — sert au suivi optimiste et au
+// tri « contenus déjà ajoutés en premier ».
+function mediaResultKey(result: FeedItem) {
+  return `${result.type}-${result.id ?? result.tvdbId ?? result.tmdbId}`;
+}
+
+// Remonte en tête les résultats déjà en bibliothèque (retour Étienne : voir
+// d'abord ce qu'on a déjà ajouté), en conservant l'ordre relatif d'origine.
+function prioritizeLibraryResults<T>(results: T[], isInLibrary: (result: T) => boolean) {
+  const inLibrary: T[] = [];
+  const others: T[] = [];
+  results.forEach((result) => (isInLibrary(result) ? inLibrary : others).push(result));
+  return [...inLibrary, ...others];
+}
+
 // --- Résultats séries / films (façon TV Time) -------------------------------
 // Taper une ligne OUVRE la fiche (sans rien ajouter) ; seul le bouton + suit
 // la série (statut « Pas commencé ») ou ajoute le film à la watchlist.
@@ -363,7 +378,11 @@ function MediaResults({ query, rawQuery }: { query: string; rawQuery: string }) 
     return <EmptyState title="Aucun résultat" message={`Aucune série ni aucun film ne correspond à « ${rawQuery.trim()} ».`} />;
   }
 
-  const shown = applyMediaFilter(results, sort, typeFilter);
+  // Filtre/tri utilisateur PUIS remontée des contenus déjà ajoutés en tête.
+  const shown = prioritizeLibraryResults(
+    applyMediaFilter(results, sort, typeFilter),
+    (result) => followed[mediaResultKey(result)] || result.inLibrary,
+  );
   const filtersActive = sort !== 'relevance' || typeFilter !== 'all';
   // Badges des filtres actifs (croix = retire ce filtre précis).
   const activeChips: ActiveChip[] = [];
@@ -554,7 +573,11 @@ function GameResults({ query, rawQuery }: { query: string; rawQuery: string }) {
       .sort((a, b) => a.localeCompare(b, 'fr'))
       .map((p) => ({ key: p, label: p })),
   ];
-  const shown = applyGameFilter(results, sort, platform);
+  // Filtre/tri utilisateur PUIS remontée des jeux déjà ajoutés en tête.
+  const shown = prioritizeLibraryResults(
+    applyGameFilter(results, sort, platform),
+    (result) => followed[keyOf(result)] || !!result.inLibrary,
+  );
   const filtersActive = sort !== 'popular' || platform !== 'all';
   // Badges des filtres actifs (croix = retire ce filtre précis).
   const activeChips: ActiveChip[] = [];
