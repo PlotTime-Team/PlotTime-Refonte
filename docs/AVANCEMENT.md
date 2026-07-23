@@ -154,6 +154,14 @@ signalement, temps de jeu) inchangés.
   sélecteur de saison, feuille épisode, menu « … » + retour, ♥ épinglé,
   statut jeu + feuille heures, possession, tuile temps de jeu, navigation
   commentaires) + régression recherche → fiche → retour (résultats conservés).
+- **Retours Étienne v2 (même jour)** : tuile note de la fiche jeu **cliquable**
+  — bascule note **joueurs ↔ presse** (/5) au tap quand les deux existent,
+  indicateur ⇄ dans le coin (la rangée « Note presse » quitte Informations,
+  la note vit dans la tuile) ; coche d'épisode sur **disque clair** pour rester
+  lisible sur les fonds lavande (file « Continuer le suivi » — cochable comme
+  avant, le POST optimiste était déjà vérifié) ; inventaire pré/post refonte
+  confirmé : **aucune section manquante** (Bande-annonce et Éditions &
+  extensions étaient juste absentes des données de test des captures).
 - **Primitives partagées** (`ScreenHeader`, `SectionHeader`, `TabHeader`,
   en-têtes de bibliothèque) : échelle typographique resserrée et suppression des
   API de sur-titre/sous-titre décoratives, afin d’imposer un titre unique par

@@ -184,22 +184,28 @@ export function FicheTabs({
 }
 
 // Tuile de stat (rangée de 3 sous la carte d'identité) : icône + valeur en
-// gras / sous-libellé, ou un texte multi-lignes (genres).
+// gras / sous-libellé, ou un texte multi-lignes (genres). `onPress` la rend
+// interactive (bascule note joueurs / presse de la fiche jeu) — `corner`
+// affiche alors le petit indicateur d'action dans le coin.
 export function StatTile({
   icon,
   value,
   sub,
   text,
   a11y,
+  onPress,
+  corner,
 }: {
   icon: React.ReactNode;
   value?: string;
   sub?: string;
   text?: string;
   a11y: string;
+  onPress?: () => void;
+  corner?: React.ReactNode;
 }) {
-  return (
-    <View style={styles.statTile} accessible accessibilityRole="text" accessibilityLabel={a11y}>
+  const body = (
+    <>
       <View style={styles.statIcon} accessible={false}>{icon}</View>
       <View style={styles.statCopy}>
         {text != null ? (
@@ -211,6 +217,24 @@ export function StatTile({
           </>
         )}
       </View>
+      {corner ? <View style={styles.statCorner} accessible={false}>{corner}</View> : null}
+    </>
+  );
+  if (onPress) {
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.statTile, pressed && styles.statTilePressed]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={a11y}
+      >
+        {body}
+      </Pressable>
+    );
+  }
+  return (
+    <View style={styles.statTile} accessible accessibilityRole="text" accessibilityLabel={a11y}>
+      {body}
     </View>
   );
 }
@@ -502,6 +526,18 @@ const styles = StyleSheet.create({
   },
   statIcon: { flexShrink: 0 },
   statCopy: { flex: 1, minWidth: 0 },
+  statTilePressed: { opacity: 0.72 },
+  statCorner: {
+    position: 'absolute',
+    top: 5,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primarySoft,
+  },
   statValue: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 14.5, lineHeight: 19 },
   statSub: { color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 11, lineHeight: 14, marginTop: 1 },
   statText: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 12, lineHeight: 16 },
@@ -545,12 +581,14 @@ const styles = StyleSheet.create({
   infoLabelWide: { width: 126 },
   infoValue: { flex: 1, minWidth: 0, color: COLORS.text, fontFamily: FONTS.bold, fontSize: 13.5, lineHeight: 19 },
   infoValueRight: { textAlign: 'right', fontFamily: FONTS.semiBold },
+  // Disque clair même non cochée : l'anneau reste lisible aussi sur les
+  // fonds lavande (file « Continuer le suivi »), pas seulement sur carte.
   epCheck: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: COLORS.primarySoft,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.surface,
   },
   epCheckOn: {
     borderColor: COLORS.success,

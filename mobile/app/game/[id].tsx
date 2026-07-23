@@ -99,6 +99,8 @@ export default function GameDetail() {
   const [artwork, setArtwork] = useState<'poster' | 'banner' | null>(null);
   const [listsOpen, setListsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  // Tuile note : bascule joueurs ↔ presse au tap (quand les deux existent).
+  const [scoreView, setScoreView] = useState<'players' | 'critics'>('players');
   const reduce = useReduceMotion();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackingLock = useRef(false);
@@ -328,14 +330,25 @@ export default function GameDetail() {
             title={game.title}
             tiles={
               <StatTiles>
-                {game.playerScore ? (
-                  <StatTile
-                    icon={<Ionicons name="star" size={21} color={COLORS.tertiary} />}
-                    value={`${rating5(game.playerScore, 100)}/5`}
-                    sub="Note joueurs"
-                    a11y={`Note des joueurs ${rating5(game.playerScore, 100)} sur 5`}
-                  />
-                ) : null}
+                {game.playerScore || game.criticScore ? (() => {
+                  // Bascule joueurs ↔ presse au tap sur la tuile (retour
+                  // Étienne 2026-07-23) — indicateur ⇄ dans le coin quand les
+                  // deux notes existent ; sinon la seule note disponible.
+                  const both = !!(game.playerScore && game.criticScore);
+                  const critics = game.playerScore ? scoreView === 'critics' : true;
+                  const score = critics ? game.criticScore! : game.playerScore!;
+                  const label = critics ? 'Note presse' : 'Note joueurs';
+                  return (
+                    <StatTile
+                      icon={<Ionicons name="star" size={21} color={COLORS.tertiary} />}
+                      value={`${rating5(score, 100)}/5`}
+                      sub={label}
+                      a11y={`${label} ${rating5(score, 100)} sur 5${both ? `. Afficher la note ${critics ? 'des joueurs' : 'de la presse'}` : ''}`}
+                      onPress={both ? () => setScoreView(critics ? 'players' : 'critics') : undefined}
+                      corner={both ? <Feather name="repeat" size={9} color={COLORS.primary} /> : undefined}
+                    />
+                  );
+                })() : null}
                 {genresTxt ? (
                   <StatTile
                     icon={<Ionicons name="game-controller-outline" size={21} color={COLORS.primary} />}
@@ -416,16 +429,15 @@ export default function GameDetail() {
           </FicheSection>
         ) : null}
 
-        {/* « Informations » (maquette) : libellé à gauche, valeur à droite —
-            la note presse (IGDB agrégée) vit ici, sur la même échelle /5. */}
-        {game.platforms || game.developer || game.publisher || game.gameModes || game.criticScore ? (
+        {/* « Informations » (maquette) : libellé à gauche, valeur à droite.
+            La note presse vit dans la TUILE note (bascule joueurs ↔ presse). */}
+        {game.platforms || game.developer || game.publisher || game.gameModes ? (
           <FicheSection icon="info" title="Informations">
             <View style={styles.infoRows}>
               {game.platforms ? <InfoRow label="Plateformes" value={game.platforms} align="right" /> : null}
               {game.developer ? <InfoRow label="Développeur" value={game.developer} align="right" /> : null}
               {game.publisher ? <InfoRow label="Éditeur" value={game.publisher} align="right" /> : null}
               {game.gameModes ? <InfoRow label="Modes" value={game.gameModes} align="right" /> : null}
-              {game.criticScore ? <InfoRow label="Note presse" value={`${rating5(game.criticScore, 100)}/5`} align="right" /> : null}
             </View>
           </FicheSection>
         ) : null}
