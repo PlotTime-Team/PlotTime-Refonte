@@ -831,6 +831,10 @@ function EpisodePage({
             ))}
           </ScrollView>
         )}
+        {/* Attribution JustWatch obligatoire (source des dispos streaming via TMDb). */}
+        {providers.length > 0 ? (
+          <Text style={styles.provCredit}>Disponibilité fournie par JustWatch</Text>
+        ) : null}
       </View>
 
       {typeof average === 'number' || episode.overview ? (
@@ -1277,6 +1281,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontFamily: FONTS.extraBold,
+  },
+  provCredit: {
+    color: COLORS.textMuted,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    marginTop: SPACE.sm,
   },
   ratingRow: {
     alignItems: 'flex-start',

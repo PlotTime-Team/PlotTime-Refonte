@@ -1201,16 +1201,20 @@ function WhereToWatch({ providers }: { providers: { name: string }[] }) {
       {providers.length === 0 ? (
         <Text style={styles.muted}>Non disponible</Text>
       ) : (
-        <View style={styles.provWrap}>
-          {providers.map((p) => (
-            <View key={p.name} style={styles.provTile}>
-              <View style={styles.provBadge} accessible={false}>
-                <Text style={styles.provBadgeText}>{p.name.slice(0, 1).toUpperCase()}</Text>
+        <>
+          <View style={styles.provWrap}>
+            {providers.map((p) => (
+              <View key={p.name} style={styles.provTile}>
+                <View style={styles.provBadge} accessible={false}>
+                  <Text style={styles.provBadgeText}>{p.name.slice(0, 1).toUpperCase()}</Text>
+                </View>
+                <Text style={styles.provName} numberOfLines={1}>{p.name}</Text>
               </View>
-              <Text style={styles.provName} numberOfLines={1}>{p.name}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+          {/* Attribution JustWatch obligatoire (source des dispos streaming via TMDb). */}
+          <Text style={styles.provCredit}>Disponibilité fournie par JustWatch</Text>
+        </>
       )}
     </FicheSection>
   );
@@ -2031,6 +2035,7 @@ const styles = StyleSheet.create({
   },
   provBadgeText: { color: COLORS.onPrimary, fontFamily: FONTS.extraBold, fontSize: 12 },
   provName: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 13 },
+  provCredit: { color: COLORS.textMuted, fontFamily: FONTS.regular, fontSize: 11, marginTop: SPACE.sm },
   railContent: { gap: SPACE.sm, paddingHorizontal: SPACE.md, paddingTop: SPACE.sm },
   castCard: { width: 96 },
   castPhoto: {

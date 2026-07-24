@@ -51,7 +51,15 @@
       ]
     ],
     "extra": {
-      "serverUrl": ""
+      "serverUrl": "https://serietime.studio-vives.fr",
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "bc87e346-1117-4da1-975d-c5c2c97fdf61"
+      }
     },
     "experiments": {
       "typedRoutes": true

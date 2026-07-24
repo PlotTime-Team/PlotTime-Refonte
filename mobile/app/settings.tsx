@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { COLORS, FONTS, GLASS_BLUR, RADIUS, SHADOW, SIZES, SPACE, applyThemePreference, getThemePreference, type ThemePreference } from '@/lib/theme';
 import { ScreenShell, ScreenHeader, SectionHeader, SegmentedFilter, PrismeCard, IconAction } from '@/components/prisme';
+import { TmdbLogo } from '@/components/TmdbLogo';
 import { goBack } from '@/lib/nav';
 import { useBackClose } from '@/lib/useBackClose';
 import { FadeSwitch, PopIn } from '@/components/anim';
@@ -787,27 +788,51 @@ function AppTab() {
         <Row label="Politique de confidentialité" onPress={() => openExternal(`${LEGAL_BASE}/privacy`)} external />
         <Row label="Conditions d'utilisation" onPress={() => openExternal(`${LEGAL_BASE}/terms`)} external />
         <View style={styles.block}>
-          <Text style={styles.attribution}>Les informations sur les œuvres proviennent de :</Text>
+          <Text style={styles.attribution}>Contenus et données fournis par :</Text>
+
+          {/* TMDb : logo officiel OBLIGATOIRE (charte API TMDb), gardé moins
+              proéminent que la marque PlotTime. Logo non recoloré/déformé. */}
+          <Pressable
+            style={({ pressed }) => [styles.sourceLogoRow, pressed && { opacity: 0.6 }]}
+            onPress={() => openExternal('https://www.themoviedb.org')}
+            accessibilityRole="link"
+            accessibilityLabel="The Movie Database — This product uses the TMDB API but is not endorsed or certified by TMDB."
+          >
+            <TmdbLogo width={44} />
+            <Text style={[styles.attribution, styles.attributionLink, styles.sourceLogoText]}>
+              This product uses the TMDB API but is not endorsed or certified by TMDB.
+            </Text>
+          </Pressable>
+
           <Text
             style={[styles.attribution, styles.attributionLink]}
             accessibilityRole="link"
-            onPress={() => openExternal('https://www.themoviedb.org/')}
+            onPress={() => openExternal('https://www.igdb.com')}
           >
-            This product uses the TMDB API but is not endorsed or certified by TMDB.
+            The data was freely provided by IGDB.com.
           </Text>
           <Text
             style={[styles.attribution, styles.attributionLink]}
             accessibilityRole="link"
-            onPress={() => openExternal('https://thetvdb.com/')}
+            onPress={() => openExternal('https://www.justwatch.com')}
           >
-            Metadata provided by TheTVDB. Please consider adding missing information or subscribing.
+            Données de disponibilité en streaming fournies par JustWatch.
           </Text>
           <Text
             style={[styles.attribution, styles.attributionLink]}
             accessibilityRole="link"
-            onPress={() => openExternal('https://www.igdb.com/')}
+            onPress={() => openExternal('https://www.youtube.com')}
           >
-            Game data provided by IGDB.com.
+            Bandes-annonces fournies par YouTube.
+          </Text>
+          <Text
+            style={styles.attributionFine}
+            accessibilityRole="link"
+            onPress={() => openExternal('https://store.steampowered.com')}
+          >
+            Import de bibliothèque via Steam. © {new Date().getFullYear()} Valve Corporation.
+            Steam et le logo Steam sont des marques déposées de Valve Corporation.
+            PlotTime n'est pas affilié à Valve ni à Steam.
           </Text>
         </View>
       </Section>
@@ -980,4 +1005,7 @@ const styles = StyleSheet.create({
   note: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.textMuted, paddingTop: SPACE.sm, lineHeight: 18, borderTopWidth: 1, borderTopColor: COLORS.borderLight, marginTop: 0 },
   attribution: { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.textMuted, lineHeight: 17, marginBottom: 6 },
   attributionLink: { color: COLORS.secondary, textDecorationLine: 'underline' },
+  sourceLogoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginTop: 2, marginBottom: 8 },
+  sourceLogoText: { flex: 1, marginBottom: 0 },
+  attributionFine: { fontSize: 11, fontFamily: FONTS.regular, color: COLORS.textMuted, lineHeight: 15, marginTop: 4 },
 });

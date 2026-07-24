@@ -69,6 +69,11 @@ données (RGPD).</p>
   <li><strong>Utilisation du service</strong> : historique de visionnage (séries,
   films, jeux), favoris et listes, notes, commentaires et réponses, réactions,
   abonnements entre utilisateurs, réglages de l'application.</li>
+  <li><strong>Import Steam (facultatif)</strong> : si vous choisissez d'importer
+  votre bibliothèque de jeux, votre identifiant Steam (SteamID) et la liste des
+  jeux possédés (avec le temps de jeu public) sont récupérés <strong>à votre
+  demande</strong> et associés à votre compte. Cet import ne se déclenche jamais
+  automatiquement.</li>
   <li><strong>Données techniques minimales</strong> : journaux serveur temporaires
   (adresse IP, horodatage) nécessaires à la sécurité et au bon fonctionnement.</li>
 </ul>
@@ -90,12 +95,28 @@ sans ces données, le service ne peut pas fonctionner.</p>
 </ul>
 
 <h2>5. Sources de données externes</h2>
-<p>Les informations sur les œuvres (titres, affiches, résumés, dates) proviennent
-de services tiers : <a href="https://www.themoviedb.org" rel="noopener">TMDb</a>,
-<a href="https://thetvdb.com" rel="noopener">TheTVDB</a> et
-<a href="https://www.igdb.com" rel="noopener">IGDB</a>. Ces requêtes sont
-effectuées par notre serveur : <strong>aucune donnée personnelle vous concernant
-ne leur est transmise</strong>.</p>
+<p>Les informations sur les œuvres (titres, affiches, résumés, dates, disponibilité
+en streaming) proviennent de services tiers :
+<a href="https://www.themoviedb.org" rel="noopener">TMDb</a>,
+<a href="https://thetvdb.com" rel="noopener">TheTVDB</a>,
+<a href="https://www.igdb.com" rel="noopener">IGDB</a>,
+<a href="https://www.justwatch.com" rel="noopener">JustWatch</a> (via TMDb, pour
+les plateformes de streaming) et <a href="https://store.steampowered.com" rel="noopener">Steam</a>
+(pour l'import de bibliothèque). Ces requêtes sont effectuées par notre serveur :
+<strong>aucune donnée personnelle vous concernant n'est transmise à ces services</strong>,
+à l'exception de l'import Steam que vous déclenchez vous-même.</p>
+<p><strong>Bandes-annonces YouTube.</strong> PlotTime utilise les
+<strong>YouTube API Services</strong> (lecteur vidéo intégré) pour afficher les
+bandes-annonces. Lorsque vous lancez la lecture d'une bande-annonce, la vidéo est
+chargée via le lecteur de <a href="https://www.youtube.com" rel="noopener">YouTube</a> :
+à ce moment, YouTube et Google peuvent collecter des données (adresse IP, appareil,
+identifiants) et déposer des cookies ou des identifiants sur votre appareil,
+conformément à la <a href="https://policies.google.com/privacy" rel="noopener">politique
+de confidentialité de Google</a>. Aucune bande-annonce n'est chargée tant que vous
+ne lancez pas vous-même la lecture. Vous pouvez à tout moment révoquer l'accès de
+YouTube/Google à vos données depuis les
+<a href="https://myaccount.google.com/permissions" rel="noopener">paramètres de
+sécurité de votre compte Google</a>.</p>
 
 <h2>6. Hébergement et sécurité</h2>
 <p>Les données sont hébergées sur un serveur situé en <strong>France (Union

@@ -111,6 +111,25 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 ## Journal des modifications
 
+### 2026-07-24 — Claude : conformité des attributions d'API tierces (avant publication App Store)
+Audit de conformité des API tierces (TMDb, TheTVDB, IGDB, YouTube, Steam) pour un
+lancement en **format gratuit** : l'app reste éligible aux tiers gratuits (aucune
+monétisation), mais des attributions manquaient. Corrections avant la 1re soumission :
+- **Réglages › À propos** (`mobile/app/settings.tsx`) : ajout du **logo officiel TMDb**
+  (nouveau composant vectoriel `mobile/components/TmdbLogo.tsx` via react-native-svg —
+  tracé + dégradé officiels non modifiés, requis par la charte API TMDb), texte IGDB
+  corrigé (« The data was freely provided by IGDB.com »), ajout des crédits **JustWatch**
+  (dispos streaming) et **YouTube** (bandes-annonces), mention légale **Valve/Steam** +
+  disclaimer de non-affiliation. **Retrait** du crédit TheTVDB (source désactivée,
+  `TVDB_ENABLED=false`). Rendu vérifié sur les 4 thèmes (Nuit/Clair/Sépia/Indigo).
+- **Crédit JustWatch contextuel** sous « Où regarder » (`mobile/app/show/[id].tsx` +
+  `mobile/components/EpisodeSheet.tsx`) — exigé par TMDb sur chaque fiche affichant la
+  disponibilité en streaming.
+- **Politique de confidentialité** (`apps/server/src/modules/legal/routes.ts`) :
+  divulgation du lecteur **YouTube** embarqué (partage de données avec Google + lien
+  de révocation, conforme aux YouTube API Services Policies), de l'**import Steam**
+  (SteamID/jeux, déclenché par l'utilisateur) et de **JustWatch**.
+
 ### 2026-07-24 — Claude/Étienne : refonte de l'onglet Profil (maquette modernisée)
 Reproduction fidèle de la nouvelle maquette du Profil, à proportions égales
 (`mobile/app/(tabs)/profile.tsx` uniquement — aucun changement serveur).
