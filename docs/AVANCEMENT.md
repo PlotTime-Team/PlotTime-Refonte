@@ -110,6 +110,30 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 ## Journal des modifications
 
+### 2026-07-24 — Claude/Étienne : favoris — les 3 pages (Séries / Films / Jeux) unifiées sur la refonte Prisme
+Les pages **Séries préférées** et **Films préférées** étaient restées sur
+l'ancien design TV Time (bouton jaune « AJOUTER/SUPPRIMER », lien bleu « Tri »,
+grand titre à gauche, barres de progression sous les affiches) — oubliées lors
+de la refonte. La page **Jeux préférés**, elle, avait déjà le nouveau design :
+elle sert désormais de référence. Les trois pages partagent maintenant la même
+coquille :
+- **En-tête `LibHeader`** : titre centré + pastille de type (📺 série / 🎬 film /
+  🎮 jeu), fond de page atténué, retour vers le profil.
+- **Carte de tri partagée** (`FavSortControl`, source unique) : pastille d'icône
+  + « Tri : … » + chevron — identique sur les trois pages (plus de divergence
+  possible).
+- **Grille d'affiches épurée** (composant `Poster`), sans les barres de
+  progression (info déplacée sur la fiche / la bibliothèque).
+- **Feuille « Trier par »** ré-habillée : pastille de sélection violette (DA)
+  au lieu du jaune, boutons ANNULER/APPLIQUER aux couleurs Prisme.
+Fonctionnalités **inchangées** pour Séries/Films : l'ajout/retrait en masse
+(bouton primaire « Ajouter ou retirer des favoris » → recherche + cœurs), le
+réordonnancement drag & drop et le partage sont conservés (bouton « ⋯ »). Les
+Jeux gardent leur périmètre V1 (favori géré depuis la fiche, pas de drag & drop).
+Vérifié par capture à 360 dp (les 3 pages + la feuille de tri) et les suites
+Playwright (fiches 11/11, retour Explorer). Rien d'autre trouvé sur l'ancien
+design lors du balayage (`reorder-favorites` était déjà refait).
+
 ### 2026-07-24 — Claude/Étienne : fiches v6 — spec maquette MESURÉE (fin du delta) + doublon genres retiré
 Le correctif v5 semblait « n'avoir rien changé » sur le téléphone d'Étienne :
 cause identifiée par mesure au pixel (calibrage sur la barre de progression de

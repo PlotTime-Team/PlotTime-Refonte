@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { goBack } from '@/lib/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
@@ -13,9 +12,9 @@ import type { FavSortKey, MediaDto } from '@/lib/types';
 // Page favoris drag & drop : séries/films uniquement (les jeux ont leur page dédiée).
 type FavKind = 'show' | 'movie';
 import { useAppStore } from '@/lib/store';
-import { COLORS, FONTS } from '@/lib/theme';
-import { LoadError, EmptyState } from '@/components/ui';
-import { Grid, ShowCell, MovieCell, type LibraryShow } from '@/components/library';
+import { COLORS, FONTS, RADIUS, SHADOW, SIZES, SPACE } from '@/lib/theme';
+import { LoadError, EmptyState, Poster } from '@/components/ui';
+import { Grid, LibHeader, LibraryGridCell, type LibraryShow } from '@/components/library';
 import { Pop, PopIn } from '@/components/anim';
 import { useReduceMotion } from '@/lib/useReduceMotion';
 import { GridSkeleton } from '@/components/skeletons';
@@ -101,14 +100,34 @@ const WORDING = {
   },
 } as const;
 
+// Carte de tri Prisme partagée par les trois pages de favoris (séries / films /
+// jeux) — une seule source de style pour garantir un rendu identique.
+export function FavSortControl({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.sortCard, pressed && styles.controlPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Trier. Tri actuel : ${label}`}
+      accessibilityHint="Ouvre les options de tri"
+    >
+      <View style={styles.sortIcon}>
+        <Feather name="list" size={18} color={COLORS.primary} />
+      </View>
+      <Text style={styles.sortCardValue} numberOfLines={1}>Tri : {label}</Text>
+      <Feather name="chevron-down" size={19} color={COLORS.primary} />
+    </Pressable>
+  );
+}
+
 // ============================================================================
-// Page « Séries/Films préférés » — copie TV Time : chevron + « ... » en haut,
-// grand titre à gauche, bouton jaune, rangée TRIER PAR (feuille de tri),
-// grille 3 colonnes triée.
+// Page « Séries/Films préférés » — refonte Prisme (même coquille que « Jeux
+// préférés ») : en-tête LibHeader + pastille de type, carte de tri partagée,
+// bouton primaire « Ajouter ou retirer », menu « ⋯ » (réordonner / partager),
+// grille d'affiches épurée. Les fonctionnalités sont inchangées.
 // ============================================================================
 export function FavoritesPage({ kind }: { kind: FavKind }) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const w = WORDING[kind];
   const [picker, setPicker] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
@@ -131,55 +150,70 @@ export function FavoritesPage({ kind }: { kind: FavKind }) {
     }
   };
 
+  const refreshControl = (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
+  );
+
   return (
-    <Pop style={{ backgroundColor: COLORS.white }}>
-      {/* En-tête TV Time : chevron à gauche, « ... » à droite, pas de titre centré. */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-        <Pressable onPress={() => goBack('/profile')} hitSlop={10} style={styles.topBtn} accessibilityRole="button" accessibilityLabel="Retour">
-          <Feather name="chevron-left" size={28} color={COLORS.black} />
-        </Pressable>
-        <Pressable
-          onPress={() => setMenuOpen(true)}
-          hitSlop={10}
-          style={[styles.topBtn, { alignItems: 'flex-end' }]}
-          accessibilityRole="button"
-          accessibilityLabel="Options"
-        >
-          <Feather name="more-horizontal" size={24} color={COLORS.black} />
-        </Pressable>
-      </View>
+    <Pop style={styles.screen}>
+      <LibHeader
+        title={w.pageTitle}
+        right={
+          <View style={styles.typeIcon} accessible={false}>
+            <Feather name={kind === 'show' ? 'tv' : 'film'} size={19} color={COLORS.primary} />
+          </View>
+        }
+      />
 
       {isLoading ? (
         <GridSkeleton />
       ) : isError && !hasData ? (
         <LoadError onRetry={refetch} busy={isRefetching} />
       ) : (
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 24 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.yellow} colors={[COLORS.yellow]} />}
-        >
-          <Text style={styles.bigTitle}>{w.pageTitle}</Text>
-          <Pressable style={styles.addBtn} onPress={() => setPicker(true)}>
-            <Text style={styles.addText}>{w.addBtn}</Text>
-          </Pressable>
-          <Pressable style={styles.sortRow} onPress={() => setSortOpen(true)}>
-            <Text style={styles.sortValue}>Tri : {sortLabel(sort)}</Text>
-          </Pressable>
-          <View style={styles.divider} />
-          {sorted.length === 0 ? (
-            <EmptyState title={w.emptyTitle} message={w.emptyMsg} />
-          ) : (
-            <Grid>
-              {sorted.map((m) =>
-                kind === 'show' ? (
-                  <ShowCell key={m.id} show={m as LibraryShow} />
-                ) : (
-                  <MovieCell key={m.id} movie={m} />
-                ),
-              )}
-            </Grid>
-          )}
-        </ScrollView>
+        <View style={styles.body}>
+          <FavSortControl label={sortLabel(sort)} onPress={() => setSortOpen(true)} />
+          <View style={styles.actionRow}>
+            <Pressable
+              style={({ pressed }) => [styles.addPrimary, pressed && styles.addPrimaryPressed]}
+              onPress={() => setPicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter ou retirer des favoris"
+            >
+              <Feather name="plus" size={18} color={COLORS.onPrimary} />
+              <Text style={styles.addPrimaryText} numberOfLines={1}>Ajouter ou retirer des favoris</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.moreBtn, pressed && styles.controlPressed]}
+              onPress={() => setMenuOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Plus d'options"
+              accessibilityHint="Réordonner ou partager les favoris"
+            >
+              <Feather name="more-horizontal" size={22} color={COLORS.primary} />
+            </Pressable>
+          </View>
+          <ScrollView
+            refreshControl={refreshControl}
+            contentContainerStyle={sorted.length === 0 ? styles.emptyScroll : styles.gridScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            {sorted.length === 0 ? (
+              <EmptyState title={w.emptyTitle} message={w.emptyMsg} />
+            ) : (
+              <Grid>
+                {sorted.map((m) => (
+                  <LibraryGridCell key={m.id}>
+                    <Poster
+                      title={m.title}
+                      uri={tmdbImage(m.posterPath)}
+                      onPress={() => router.push(kind === 'movie' ? `/show/${m.id}?type=movie` : `/show/${m.id}`)}
+                    />
+                  </LibraryGridCell>
+                ))}
+              </Grid>
+            )}
+          </ScrollView>
+        </View>
       )}
 
       <FavPicker kind={kind} visible={picker} items={all} onClose={() => setPicker(false)} />
@@ -194,12 +228,12 @@ export function FavoritesPage({ kind }: { kind: FavKind }) {
           style={styles.menuRow}
           onPress={() => { setMenuOpen(false); router.push(`/library/reorder-favorites?type=${kind}`); }}
         >
-          <MaterialCommunityIcons name="swap-vertical" size={20} color={COLORS.black} />
+          <MaterialCommunityIcons name="swap-vertical" size={20} color={COLORS.text} />
           <Text style={styles.menuLabel}>Réordonner les éléments</Text>
         </Pressable>
         <View style={styles.sheetSep} />
         <Pressable style={styles.menuRow} onPress={() => { setMenuOpen(false); share(); }}>
-          <Feather name="share" size={19} color={COLORS.black} />
+          <Feather name="share" size={19} color={COLORS.text} />
           <Text style={styles.menuLabel}>Partager</Text>
         </Pressable>
       </BottomSheet>
@@ -233,7 +267,7 @@ export function SortSheet({
             <Text style={styles.optionLabel}>{o.label}</Text>
             {temp === o.key ? (
               <PopIn style={styles.radioOn}>
-                <Feather name="check" size={16} color={COLORS.onAccent} />
+                <Feather name="check" size={16} color={COLORS.onPrimary} />
               </PopIn>
             ) : (
               <View style={styles.radioOff} />
@@ -378,11 +412,11 @@ function FavPicker({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: COLORS.white, paddingTop: insets.top }}>
         <View style={styles.pickerHead}>
-          <Pressable onPress={onClose} hitSlop={10} style={styles.topBtn} accessibilityRole="button" accessibilityLabel="Fermer">
-            <Feather name="chevron-left" size={28} color={COLORS.black} />
+          <Pressable onPress={onClose} hitSlop={10} style={styles.pickerBtn} accessibilityRole="button" accessibilityLabel="Fermer">
+            <Feather name="chevron-left" size={26} color={COLORS.text} />
           </Pressable>
           <Text style={styles.pickerTitle}>{w.pickerTitle}</Text>
-          <View style={styles.topBtn} />
+          <View style={styles.pickerBtn} />
         </View>
         <View style={styles.searchbar}>
           <Feather name="search" size={20} color={COLORS.textMuted} />
@@ -426,18 +460,76 @@ function FavPicker({
   );
 }
 
-// Cotes recalées au px sur les captures TV Time (même téléphone) : grand
-// titre 21, bouton jaune ~38dp (texte 13), TRIER PAR 11/16, titre de feuille
-// 18, options 15 / rangées ~50dp, pastille 28, boutons de feuille ~40dp.
 const styles = StyleSheet.create({
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 2 },
-  topBtn: { width: 46, paddingVertical: 8, justifyContent: 'center' },
-  bigTitle: { color: COLORS.text, fontSize: 18, lineHeight: 24, fontFamily: FONTS.bold, paddingHorizontal: 16, marginTop: 6, marginBottom: 12 },
-  addBtn: { backgroundColor: COLORS.yellow, borderRadius: 999, marginHorizontal: 12, paddingVertical: 10, alignItems: 'center' },
-  addText: { color: COLORS.onAccent, fontSize: 13, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
-  sortRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
-  sortValue: { fontSize: 14, lineHeight: 20, fontFamily: FONTS.semiBold, color: COLORS.blue },
-  divider: { height: 1, backgroundColor: COLORS.borderLight, marginBottom: 12 },
+  screen: { backgroundColor: COLORS.bg },
+  body: { flex: 1 },
+  // Pastille de type (série / film) à droite de l'en-tête — même DA que la
+  // pastille manette de « Jeux préférés ».
+  typeIcon: {
+    width: SIZES.touch,
+    height: SIZES.touch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    borderRadius: RADIUS.control,
+    backgroundColor: COLORS.primarySoft,
+  },
+  // Carte de tri (partagée avec « Jeux préférés » via FavSortControl).
+  sortCard: {
+    minHeight: 68,
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.sm,
+    marginHorizontal: SPACE.md,
+    marginTop: SPACE.md,
+    paddingHorizontal: SPACE.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.surface,
+    ...SHADOW.card,
+  },
+  sortIcon: {
+    width: SIZES.touch,
+    height: SIZES.touch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.control,
+    backgroundColor: COLORS.primarySoft,
+  },
+  sortCardValue: { flex: 1, minWidth: 0, color: COLORS.text, fontSize: 15, lineHeight: 21, fontFamily: FONTS.bold },
+  controlPressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
+  // Rangée d'actions : bouton primaire « Ajouter ou retirer » + « ⋯ ».
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginHorizontal: SPACE.md, marginTop: SPACE.sm },
+  addPrimary: {
+    flex: 1,
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACE.xs,
+    paddingHorizontal: SPACE.md,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.primary,
+    ...SHADOW.card,
+  },
+  addPrimaryPressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
+  addPrimaryText: { color: COLORS.onPrimary, fontSize: 14, lineHeight: 19, fontFamily: FONTS.extraBold, letterSpacing: 0.2 },
+  moreBtn: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.surface,
+    ...SHADOW.card,
+  },
+  gridScroll: { paddingTop: SPACE.md, paddingBottom: SPACE.xl },
+  emptyScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACE.xl },
   // Feuilles basses
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: COLORS.sheet, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 6 },
@@ -446,17 +538,18 @@ const styles = StyleSheet.create({
   sheetSep: { height: 1, backgroundColor: COLORS.borderLight, marginHorizontal: 20 },
   optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
   optionLabel: { color: COLORS.text, fontSize: 15, fontFamily: FONTS.regular, flex: 1 },
-  radioOn: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.yellow, alignItems: 'center', justifyContent: 'center' },
-  radioOff: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: '#cfcfcf' },
+  radioOn: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  radioOff: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: COLORS.border },
   sheetFooter: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: COLORS.borderLight, marginTop: 6 },
-  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: COLORS.black, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
+  cancelBtn: { flex: 1, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: RADIUS.pill, paddingVertical: 11, alignItems: 'center' },
   cancelText: { color: COLORS.text, fontSize: 13, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
-  applyBtn: { flex: 1, backgroundColor: COLORS.yellow, borderRadius: 999, paddingVertical: 11, alignItems: 'center' },
-  applyText: { color: COLORS.onAccent, fontSize: 13, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
+  applyBtn: { flex: 1, backgroundColor: COLORS.primary, borderRadius: RADIUS.pill, paddingVertical: 11, alignItems: 'center' },
+  applyText: { color: COLORS.onPrimary, fontSize: 13, fontFamily: FONTS.extraBold, letterSpacing: 0.5 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 13 },
   menuLabel: { color: COLORS.text, fontSize: 15, fontFamily: FONTS.regular },
   // Page Ajouter/Supprimer
   pickerHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
+  pickerBtn: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
   pickerTitle: { color: COLORS.text, flex: 1, textAlign: 'center', fontSize: 18, fontFamily: FONTS.bold },
   searchbar: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, height: 52, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   searchInput: { color: COLORS.text, flex: 1, fontFamily: FONTS.regular, fontSize: 16, borderWidth: 0, paddingVertical: 8 },

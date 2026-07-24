@@ -1,14 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, RefreshControl } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import type { MediaDto } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
-import { COLORS, FONTS, RADIUS, SHADOW, SIZES, SPACE } from '@/lib/theme';
+import { COLORS, RADIUS, SIZES, SPACE } from '@/lib/theme';
 import { EmptyState, LoadError, Poster } from '@/components/ui';
-import { SORT_OPTIONS, SortSheet, sortFavorites } from '@/components/favorites';
+import { FavSortControl, SORT_OPTIONS, SortSheet, sortFavorites } from '@/components/favorites';
 import { Grid, LibHeader, LibraryGridCell } from '@/components/library';
 import { Pop } from '@/components/anim';
 import { GridSkeleton } from '@/components/skeletons';
@@ -66,21 +66,7 @@ export default function FavoriteGamesScreen() {
         </ScrollView>
       ) : (
         <View style={styles.body}>
-          <Pressable
-            style={({ pressed }) => [styles.sortRow, pressed && styles.sortPressed]}
-            onPress={() => setSortOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel={`Trier les jeux. Tri actuel : ${sortLabel}`}
-            accessibilityHint="Ouvre les options de tri"
-          >
-            <View style={styles.sortIcon}>
-              <Feather name="list" size={18} color={COLORS.primary} />
-            </View>
-            <View style={styles.sortCopy}>
-              <Text style={styles.sortValue} numberOfLines={1}>Tri : {sortLabel}</Text>
-            </View>
-            <Feather name="chevron-down" size={19} color={COLORS.primary} />
-          </Pressable>
+          <FavSortControl label={sortLabel} onPress={() => setSortOpen(true)} />
           <ScrollView
             refreshControl={refreshControl}
             contentContainerStyle={styles.scrollContent}
@@ -115,7 +101,7 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: COLORS.bg },
   body: { flex: 1 },
   emptyScroll: { flexGrow: 1, justifyContent: 'center' },
-  scrollContent: { paddingBottom: SPACE.xl },
+  scrollContent: { paddingTop: SPACE.md, paddingBottom: SPACE.xl },
   gameIcon: {
     width: SIZES.touch,
     height: SIZES.touch,
@@ -126,35 +112,4 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.control,
     backgroundColor: COLORS.primarySoft,
   },
-  sortRow: {
-    width: 'auto',
-    maxWidth: SIZES.contentMax - SPACE.md * 2,
-    minHeight: 68,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACE.sm,
-    marginHorizontal: SPACE.md,
-    marginTop: SPACE.md,
-    marginBottom: SPACE.xs,
-    paddingHorizontal: SPACE.md,
-    borderWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-    borderColor: COLORS.borderLight,
-    borderRadius: RADIUS.card,
-    backgroundColor: COLORS.surface,
-    ...SHADOW.card,
-  },
-  sortPressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
-  sortIcon: {
-    width: SIZES.touch,
-    height: SIZES.touch,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADIUS.control,
-    backgroundColor: COLORS.primarySoft,
-  },
-  sortCopy: { flex: 1, minWidth: 0 },
-
-  sortValue: { color: COLORS.text, fontSize: 15, lineHeight: 21, fontFamily: FONTS.bold },
 });
