@@ -173,7 +173,7 @@ PlotTime est disponible en application et sur le web.
 | Visuel | Spéc. Google | État |
 |---|---|---|
 | **Icône haute résolution** | 512 × 512 px, PNG 32 bits, ≤ 1 Mo | ✅ Présente — `assets/branding/icon-google-play-512.png` |
-| **Feature graphic (bandeau)** | 1024 × 500 px, PNG/JPG 24 bits, ≤ 1 Mo, **obligatoire** | ❌ **À créer** — introuvable dans `assets/branding/` |
+| **Feature graphic (bandeau)** | 1024 × 500 px, PNG/JPG 24 bits, ≤ 1 Mo, **obligatoire** | ✅ **Créé** — `mobile/assets/branding/feature-graphic-1024x500.png` (162 Ko). Régénérable : `python3 mobile/scripts/feature-graphic.py` |
 | **Captures téléphone** | **min. 2** (jusqu'à 8), PNG/JPG, côté 320–3840 px, ratio 16:9 ou 9:16 | ⏳ **À produire [À personnaliser]** — recommandé : 5–8 (Accueil « À voir », fiche série + progression, Agenda des sorties, Explorer, Profil/stats, Social/commentaires) |
 | Captures tablette 7" et 10" | mêmes contraintes | Optionnel — **[À personnaliser]** requis seulement si vous ciblez explicitement les tablettes |
 | Vidéo promo (YouTube) | URL YouTube publique | Optionnel — **[À personnaliser]** |
