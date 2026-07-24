@@ -299,17 +299,6 @@ export default function Setup() {
                     gardent la connexion classique (onglet « Se connecter »). */}
                 {mode === 'register' && (ssoWebAvailable() || nativeSsoReady) ? (
                   <>
-                    <View style={styles.ssoIntro}>
-                      <View style={styles.ssoIntroIcon}>
-                        <Feather name="shield" size={18} color={COLORS.primary} />
-                      </View>
-                      <View style={styles.ssoIntroCopy}>
-                        <Text style={styles.ssoTitle}>Une inscription simple et sûre</Text>
-                        <Text style={styles.ssoNote}>
-                          Inscris-toi en un clic — pas de mot de passe à retenir, et tu récupères ton compte à tout moment.
-                        </Text>
-                      </View>
-                    </View>
                     {ssoWebAvailable() ? (
                       <SsoButtons onToken={oauth} separator={null} />
                     ) : (
@@ -651,26 +640,6 @@ const styles = StyleSheet.create({
   modeOptionPressed: { opacity: 0.75 },
   modeText: { color: COLORS.text, fontFamily: FONTS.semiBold, fontSize: 13 },
   modeTextSelected: { color: COLORS.primary, fontFamily: FONTS.bold },
-  ssoIntro: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACE.sm,
-    backgroundColor: COLORS.primarySoft,
-    borderRadius: RADIUS.card,
-    padding: SPACE.md,
-    marginTop: SPACE.xs,
-  },
-  ssoIntroIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.surface,
-  },
-  ssoIntroCopy: { flex: 1 },
-  ssoTitle: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 14, lineHeight: 19 },
-  ssoNote: { color: COLORS.text, fontFamily: FONTS.regular, fontSize: 13, lineHeight: 19, marginTop: 2 },
   linkButton: {
     minHeight: SIZES.touch,
     flexDirection: 'row',

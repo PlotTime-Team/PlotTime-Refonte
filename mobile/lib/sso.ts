@@ -54,8 +54,12 @@ export async function initGoogleButton(
   // Largeur : on colle au conteneur (les boutons voisins Discord/e-mail font
   // toute la largeur) — GSI plafonne à 400 px, donc pas plus. 300 px centré
   // paraissait « mal fichu » à côté des autres (retour 2026-07-22).
+  // Le bouton GSI (iframe cross-origin) rend parfois 1–2 px plus large que la
+  // largeur demandée → en thème sombre, la pilule blanche « déborde » des boutons
+  // voisins (Discord/e-mail). On retranche une petite marge pour garantir qu'il
+  // reste DANS le conteneur, quelle que soit la mesure. Invisible en thème clair.
   const containerWidth = Math.floor(el.getBoundingClientRect().width || 320);
-  const buttonWidth = Math.max(200, Math.min(400, containerWidth));
+  const buttonWidth = Math.max(200, Math.min(400, containerWidth) - 8);
   g.accounts.id.renderButton(el, {
     type: 'standard',
     // Bouton officiel Google en `outline` (pilule blanche) : c'est le rendu
