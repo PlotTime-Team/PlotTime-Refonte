@@ -71,12 +71,13 @@ export function StatusLine({
           >
             <Feather
               name={icon}
-              size={17}
+              size={16}
               color={selected ? COLORS.onPrimary : COLORS.textMuted}
             />
             <Text
               style={[styles.segmentText, selected && styles.segmentTextSel]}
               numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
             >
               {o.label}
             </Text>
@@ -90,21 +91,22 @@ export function StatusLine({
 const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
-    padding: 4,
+    padding: 3,
     gap: 2,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.surfaceMuted,
   },
+  // Segments compacts (cotes maquette ≈ 50dp au total).
   segment: {
     flex: 1,
     minWidth: 0,
-    minHeight: 58,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     paddingHorizontal: 2,
-    paddingVertical: SPACE.xs,
-    borderRadius: RADIUS.card - 4,
+    paddingVertical: 6,
+    borderRadius: RADIUS.card - 3,
   },
   segmentSel: {
     backgroundColor: COLORS.primary,
@@ -119,7 +121,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     color: COLORS.text,
     fontFamily: FONTS.semiBold,
-    fontSize: 12,
+    fontSize: 11.5,
   },
   segmentTextSel: {
     color: COLORS.onPrimary,

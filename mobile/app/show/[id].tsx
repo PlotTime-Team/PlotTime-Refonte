@@ -294,8 +294,9 @@ export default function ShowDetail() {
 
   // Bannière (refonte 2026-07-23) : elle DÉFILE avec le contenu — plus d'en-
   // tête rétractable ; les boutons retour / cœur / menu restent épinglés.
-  // Légèrement rehaussée (retour Étienne 2026-07-24 : « en voir un peu plus »).
-  const heroH = insets.top + (width >= 700 ? 276 : 220);
+  // PROPORTIONNELLE à la largeur (~56 %, cotes maquette) : à hauteur fixe elle
+  // paraissait écrasée sur les écrans larges (retour Étienne 2026-07-24).
+  const heroH = insets.top + Math.min(300, Math.round(Math.min(width, SIZES.contentMax) * 0.56));
 
   // Explorer : dès que ce titre a un statut (déjà vu / à voir / en cours…), le
   // marquer « suivi cette session » pour que le deck figé de l'Explorer cesse
@@ -392,7 +393,7 @@ export default function ShowDetail() {
             <StatTiles>
               {media.voteAverage ? (
                 <StatTile
-                  icon={<Ionicons name="star" size={21} color={COLORS.tertiary} />}
+                  icon={<Ionicons name="star" size={19} color={COLORS.tertiary} />}
                   value={`${rating5(media.voteAverage, 10)}/5`}
                   sub="Note TMDb"
                   a11y={`Note ${rating5(media.voteAverage, 10)} sur 5`}
@@ -400,7 +401,7 @@ export default function ShowDetail() {
               ) : null}
               {genresTxt ? (
                 <StatTile
-                  icon={<MaterialCommunityIcons name="drama-masks" size={21} color={COLORS.primary} />}
+                  icon={<MaterialCommunityIcons name="drama-masks" size={19} color={COLORS.primary} />}
                   text={genresTxt}
                   a11y={`Genres : ${genresTxt}`}
                 />
@@ -408,7 +409,7 @@ export default function ShowDetail() {
               {isMovie
                 ? (media.runtime ? (
                     <StatTile
-                      icon={<Feather name="clock" size={19} color={COLORS.primary} />}
+                      icon={<Feather name="clock" size={18} color={COLORS.primary} />}
                       value={fmtRuntime(media.runtime)}
                       sub="Durée"
                       a11y={`Durée ${fmtRuntime(media.runtime)}`}
@@ -416,7 +417,7 @@ export default function ShowDetail() {
                   ) : null)
                 : (seasonsCount ? (
                     <StatTile
-                      icon={<Ionicons name="layers-outline" size={21} color={COLORS.primary} />}
+                      icon={<Ionicons name="layers-outline" size={18} color={COLORS.primary} />}
                       value={`${seasonsCount} saison${seasonsCount > 1 ? 's' : ''}`}
                       sub={totalEps ? `${totalEps} épisode${totalEps > 1 ? 's' : ''}` : undefined}
                       a11y={`${seasonsCount} saisons${totalEps ? `, ${totalEps} épisodes` : ''}`}
@@ -426,7 +427,7 @@ export default function ShowDetail() {
           </>
         }
       >
-        <Text style={styles.identityMeta}>{identityMeta}</Text>
+        <Text style={styles.identityMeta} maxFontSizeMultiplier={1.2}>{identityMeta}</Text>
       </FicheIdentity>
     </>
   );
@@ -434,7 +435,7 @@ export default function ShowDetail() {
   // Carte « Suivi » : contrôle segmenté pleine largeur (maquette).
   const trackingLine = (
     <View style={styles.trackCard}>
-      <Text style={styles.trackTitle}>Suivi</Text>
+      <Text style={styles.trackTitle} maxFontSizeMultiplier={1.2}>Suivi</Text>
       <StatusLine
         options={isMovie ? MOVIE_STATUS_OPTIONS : SHOW_STATUS_OPTIONS}
         value={media.userStatus ?? null}
@@ -1784,7 +1785,7 @@ function EpisodesTab({ showId, title, posterPath, runtime, onChange, ficheTop }:
       {airedTotal > 0 ? (
         <View style={styles.progressCard}>
           <View style={styles.progressHead}>
-            <Text style={styles.trackTitle}>Ma progression</Text>
+            <Text style={styles.trackTitle} maxFontSizeMultiplier={1.2}>Ma progression</Text>
             <EpisodeCheck
               checked={caughtUp}
               size={34}
@@ -1794,7 +1795,7 @@ function EpisodesTab({ showId, title, posterPath, runtime, onChange, ficheTop }:
             />
           </View>
           <View style={styles.progressRow}>
-            <ProgressRing size={104} stroke={11} pct={progressPct}>
+            <ProgressRing size={96} stroke={10} pct={progressPct}>
               <Text style={styles.progressPct}>{Math.round(progressPct)}%</Text>
               <Text style={styles.progressPctSub}>terminée</Text>
             </ProgressRing>
@@ -1859,7 +1860,7 @@ function EpisodesTab({ showId, title, posterPath, runtime, onChange, ficheTop }:
           fait défiler les saisons, la coche marque/démarque toute la saison. */}
       <View style={styles.episodesCard}>
         <View style={styles.episodesHead}>
-          <Text style={styles.trackTitle}>Épisodes</Text>
+          <Text style={styles.trackTitle} maxFontSizeMultiplier={1.2}>Épisodes</Text>
           <View style={styles.episodesHeadRight}>
             <Pressable
               style={({ pressed }) => [styles.seasonPickRow, pressed && styles.pressed]}
@@ -2000,8 +2001,8 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.text,
     fontFamily: FONTS.extraBold,
-    fontSize: 16.5,
-    lineHeight: 21,
+    fontSize: 15.5,
+    lineHeight: 20,
     marginBottom: SPACE.sm,
   },
   muted: { color: COLORS.textMuted, fontFamily: FONTS.regular, fontSize: 13.5, lineHeight: 20, marginTop: SPACE.sm },
@@ -2092,11 +2093,11 @@ const styles = StyleSheet.create({
   },
   progressHead: { flexDirection: 'row', alignItems: 'center' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.lg, marginTop: SPACE.xs },
-  progressPct: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 21 },
+  progressPct: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 20 },
   progressPctSub: { color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 11, marginTop: 1 },
   progressStats: { flex: 1, minWidth: 0, gap: SPACE.md },
   progressStat: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
-  progressStatValue: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 16, lineHeight: 20 },
+  progressStatValue: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 15, lineHeight: 19 },
   progressStatSub: { color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 12, lineHeight: 16 },
   // Carte « Épisodes ».
   episodesCard: {

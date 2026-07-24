@@ -284,9 +284,10 @@ export default function GameDetail() {
   }, [feedIgdbId, feedStatus]);
 
   // Bannière (refonte 2026-07-23) : mêmes cotes que les fiches série/film —
-  // elle défile avec le contenu, les boutons restent épinglés. Légèrement
-  // rehaussée (retour Étienne 2026-07-24 : « en voir un peu plus »).
-  const heroH = insets.top + (width >= 700 ? 276 : 220);
+  // elle défile avec le contenu, les boutons restent épinglés.
+  // PROPORTIONNELLE à la largeur (~56 %, cotes maquette) : à hauteur fixe elle
+  // paraissait écrasée sur les écrans larges (retour Étienne 2026-07-24).
+  const heroH = insets.top + Math.min(300, Math.round(Math.min(width, SIZES.contentMax) * 0.56));
 
   if (detail.isLoading) return <FicheSkeleton heroHeight={heroH} />;
   if (!detail.data) return <LoadError onRetry={detail.refetch} busy={detail.isRefetching} />;
@@ -347,7 +348,7 @@ export default function GameDetail() {
                   const label = critics ? 'Note presse' : 'Note joueurs';
                   return (
                     <StatTile
-                      icon={<Ionicons name="star" size={21} color={COLORS.tertiary} />}
+                      icon={<Ionicons name="star" size={19} color={COLORS.tertiary} />}
                       value={`${rating5(score, 100)}/5`}
                       sub={label}
                       a11y={`${label} ${rating5(score, 100)} sur 5${both ? `. Afficher la note ${critics ? 'des joueurs' : 'de la presse'}` : ''}`}
@@ -358,14 +359,14 @@ export default function GameDetail() {
                 })() : null}
                 {genresTxt ? (
                   <StatTile
-                    icon={<Ionicons name="game-controller-outline" size={21} color={COLORS.primary} />}
+                    icon={<Ionicons name="game-controller-outline" size={19} color={COLORS.primary} />}
                     text={game.genres!.split(',').map((g) => g.trim()).filter(Boolean).slice(0, 2).join('\n')}
                     a11y={`Genres : ${genresTxt}`}
                   />
                 ) : null}
                 {releaseTxt ? (
                   <StatTile
-                    icon={<Feather name="calendar" size={19} color={COLORS.primary} />}
+                    icon={<Feather name="calendar" size={18} color={COLORS.primary} />}
                     value={releaseDay ?? releaseTxt}
                     sub={releaseYear ?? undefined}
                     a11y={`Sortie le ${releaseTxt}`}
@@ -374,7 +375,7 @@ export default function GameDetail() {
               </StatTiles>
             }
           >
-            {genresTxt ? <Text style={styles.identityMeta}>{genresTxt}</Text> : null}
+            {genresTxt ? <Text style={styles.identityMeta} maxFontSizeMultiplier={1.2}>{genresTxt}</Text> : null}
             {platformList.length ? (
               <View
                 style={styles.platRow}
@@ -384,7 +385,11 @@ export default function GameDetail() {
               >
                 {platformList.map((p) => (
                   <View key={p} style={styles.platBadge} accessible={false}>
-                    <Text style={styles.platBadgeText} numberOfLines={1}>{p}</Text>
+                    {/* Affichage court : « PC (Microsoft Windows) » → « PC »
+                        (le nom complet reste dans le libellé d'accessibilité). */}
+                    <Text style={styles.platBadgeText} numberOfLines={1} maxFontSizeMultiplier={1.15}>
+                      {p.replace(/\s*\(.+\)\s*$/, '')}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -394,7 +399,7 @@ export default function GameDetail() {
         {/* Suivi : contrôle segmenté pleine largeur (maquette) — re-taper le
             statut actif le DÉSÉLECTIONNE (retrait du suivi). */}
         <View style={styles.trackCard}>
-          <Text style={styles.trackTitle}>Suivi</Text>
+          <Text style={styles.trackTitle} maxFontSizeMultiplier={1.2}>Suivi</Text>
           <StatusLine
             options={GAME_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
             value={game.userStatus}
@@ -426,12 +431,12 @@ export default function GameDetail() {
               }
             >
               <View style={styles.playtimeIcon}>
-                <Ionicons name="stopwatch" size={17} color={COLORS.primary} />
+                <Ionicons name="stopwatch" size={16} color={COLORS.primary} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.playtimeLabel}>Temps de jeu</Text>
+                <Text style={styles.playtimeLabel} maxFontSizeMultiplier={1.2}>Temps de jeu</Text>
                 {game.playtimeMinutes ? (
-                  <Text style={styles.playtimeValue} numberOfLines={1}>{formatPlaytime(game.playtimeMinutes)}</Text>
+                  <Text style={styles.playtimeValue} numberOfLines={1} maxFontSizeMultiplier={1.2}>{formatPlaytime(game.playtimeMinutes)}</Text>
                 ) : (
                   <Text style={styles.playtimeCta}>Déclarer mes heures</Text>
                 )}
@@ -576,7 +581,7 @@ function OwnedToggle({ on, disabled, onToggle }: { on: boolean; disabled?: boole
 
   return (
     <View style={[styles.ownedRow, disabled && styles.controlDisabled]}>
-      <Text style={styles.ownedLabel}>Je possède ce jeu</Text>
+      <Text style={styles.ownedLabel} maxFontSizeMultiplier={1.2}>Je possède ce jeu</Text>
       <Pressable
         style={styles.toggleTarget}
         onPress={() => onToggle(!on)}
@@ -1404,24 +1409,24 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   // Badges de plateformes (PJ Étienne, adaptés à la DA) : pilules lavande
-  // compactes, texte fort, retour à la ligne libre.
+  // COMPACTES (noms courts, parenthèses retirées), retour à la ligne libre.
   platRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 4,
     marginTop: SPACE.xs,
   },
   platBadge: {
-    minHeight: 24,
+    minHeight: 21,
     justifyContent: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.surfaceMuted,
   },
   platBadgeText: {
     color: COLORS.text,
     fontFamily: FONTS.bold,
-    fontSize: 11.5,
+    fontSize: 10.5,
   },
   // Cartes « contrôle » (Suivi, Je possède) : titre bold sans pastille — les
   // sections de CONTENU passent par FicheSection (pastille d'icône).
@@ -1438,8 +1443,8 @@ const styles = StyleSheet.create({
   trackTitle: {
     color: COLORS.text,
     fontFamily: FONTS.extraBold,
-    fontSize: 16.5,
-    lineHeight: 21,
+    fontSize: 15.5,
+    lineHeight: 20,
     marginBottom: SPACE.sm,
   },
   infoRows: { marginTop: SPACE.xs },
@@ -1458,7 +1463,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     color: COLORS.text,
     fontFamily: FONTS.extraBold,
-    fontSize: 16.5,
+    fontSize: 15.5,
   },
   toggleTarget: {
     width: 60,
@@ -1483,7 +1488,7 @@ const styles = StyleSheet.create({
   // Tuile « TEMPS DE JEU » (maquette) : fond lavande, libellé en petites
   // capitales, valeur en gras, crayon d'édition à droite.
   playtimeTile: {
-    minHeight: 64,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACE.sm,
@@ -1495,12 +1500,12 @@ const styles = StyleSheet.create({
   },
   playtimeTilePressed: { opacity: 0.75 },
   playtimeIcon: {
-    width: 32, height: 32, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface,
+    width: 28, height: 28, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  playtimeLabel: { color: COLORS.primary, fontSize: 11, fontFamily: FONTS.extraBold, letterSpacing: 0.9, textTransform: 'uppercase' },
-  playtimeValue: { color: COLORS.text, fontSize: 18, fontFamily: FONTS.extraBold, marginTop: 2 },
-  playtimeCta: { color: COLORS.text, fontSize: 14.5, fontFamily: FONTS.bold, marginTop: 2 },
+  playtimeLabel: { color: COLORS.primary, fontSize: 10.5, fontFamily: FONTS.extraBold, letterSpacing: 0.9, textTransform: 'uppercase' },
+  playtimeValue: { color: COLORS.text, fontSize: 17, fontFamily: FONTS.extraBold, marginTop: 1 },
+  playtimeCta: { color: COLORS.text, fontSize: 14, fontFamily: FONTS.bold, marginTop: 1 },
   overview: {
     color: COLORS.text,
     fontFamily: FONTS.regular,

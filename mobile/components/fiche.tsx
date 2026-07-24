@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Platform, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
@@ -119,6 +119,9 @@ export function FicheBanner({
 
 // Carte d'identité : chevauche la bannière, jaquette flottante à liseré clair
 // à gauche, badge de type + titre + méta à droite, puis la rangée de tuiles.
+// La jaquette est PROPORTIONNELLE à la largeur (~33 %, cotes maquette) : à
+// taille fixe, elle paraissait minuscule sur les écrans larges et toute la
+// carte semblait « grossière » (retour Étienne 2026-07-24).
 export function FicheIdentity({
   posterUri,
   posterFallback,
@@ -136,21 +139,23 @@ export function FicheIdentity({
   children?: React.ReactNode;
   tiles?: React.ReactNode;
 }) {
+  const { width } = useWindowDimensions();
+  const frameW = Math.min(150, Math.max(116, Math.round(Math.min(width, SIZES.contentMax) * 0.33)));
   return (
     <View style={styles.identityCard}>
       <View style={styles.identityRow}>
-        <View style={styles.posterFrame}>
+        <View style={[styles.posterFrame, { width: frameW }]}>
           {posterUri ? (
-            <Image source={{ uri: posterUri }} style={styles.poster} resizeMode="cover" accessibilityLabel={posterLabel} />
+            <Image source={{ uri: posterUri }} style={[styles.poster, { width: frameW - 8 }]} resizeMode="cover" accessibilityLabel={posterLabel} />
           ) : (
-            <View style={[styles.poster, styles.posterEmpty]}>{posterFallback}</View>
+            <View style={[styles.poster, styles.posterEmpty, { width: frameW - 8 }]}>{posterFallback}</View>
           )}
         </View>
         <View style={styles.identityCopy}>
           <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>{badge}</Text>
+            <Text style={styles.typeBadgeText} maxFontSizeMultiplier={1.15}>{badge}</Text>
           </View>
-          <Text accessibilityRole="header" style={styles.identityTitle}>{title}</Text>
+          <Text accessibilityRole="header" style={styles.identityTitle} maxFontSizeMultiplier={1.15}>{title}</Text>
           {children}
         </View>
       </View>
@@ -185,7 +190,7 @@ export function FicheTabs({
             accessibilityLabel={o.label}
             accessibilityState={{ selected }}
           >
-            <Text style={[styles.tabText, selected && styles.tabTextOn]} numberOfLines={1}>{o.label}</Text>
+            <Text style={[styles.tabText, selected && styles.tabTextOn]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -219,11 +224,11 @@ export function StatTile({
       <View style={styles.statIcon} accessible={false}>{icon}</View>
       <View style={styles.statCopy}>
         {text != null ? (
-          <Text style={styles.statText} numberOfLines={3}>{text}</Text>
+          <Text style={styles.statText} numberOfLines={3} maxFontSizeMultiplier={1.2}>{text}</Text>
         ) : (
           <>
-            <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
-            {sub ? <Text style={styles.statSub} numberOfLines={2}>{sub}</Text> : null}
+            <Text style={styles.statValue} numberOfLines={1} maxFontSizeMultiplier={1.2}>{value}</Text>
+            {sub ? <Text style={styles.statSub} numberOfLines={2} maxFontSizeMultiplier={1.2}>{sub}</Text> : null}
           </>
         )}
       </View>
@@ -274,9 +279,9 @@ export function FicheSection({
     <View style={[styles.sectionCard, flush && styles.sectionFlush, style]}>
       <View style={[styles.sectionHead, flush && styles.sectionHeadFlush]}>
         <View style={styles.sectionChip} accessible={false}>
-          <Feather name={icon} size={16} color={COLORS.primary} />
+          <Feather name={icon} size={15} color={COLORS.primary} />
         </View>
-        <Text accessibilityRole="header" style={styles.sectionTitle} numberOfLines={2}>{title}</Text>
+        <Text accessibilityRole="header" style={styles.sectionTitle} numberOfLines={2} maxFontSizeMultiplier={1.2}>{title}</Text>
         {trailing}
       </View>
       {children}
@@ -301,11 +306,11 @@ export function InfoRow({
     <View style={styles.infoRow} accessible accessibilityRole="text" accessibilityLabel={`${label} : ${value}`}>
       {icon ? (
         <View style={styles.infoIcon} accessible={false}>
-          <Feather name={icon} size={14} color={COLORS.primary} />
+          <Feather name={icon} size={13} color={COLORS.primary} />
         </View>
       ) : null}
-      <Text style={[styles.infoLabel, icon ? null : styles.infoLabelWide]}>{label}</Text>
-      <Text style={[styles.infoValue, align === 'right' && styles.infoValueRight]}>{value}</Text>
+      <Text style={[styles.infoLabel, icon ? null : styles.infoLabelWide]} maxFontSizeMultiplier={1.2}>{label}</Text>
+      <Text style={[styles.infoValue, align === 'right' && styles.infoValueRight]} maxFontSizeMultiplier={1.2}>{value}</Text>
     </View>
   );
 }
@@ -465,6 +470,7 @@ const styles = StyleSheet.create({
   identityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
   // Jaquette flottante : dépasse de la carte vers la bannière, liseré épais
   // de la couleur de la carte (façon cadre) + ombre.
+  // Largeur de la jaquette : posée dynamiquement (~33 % de la largeur).
   posterFrame: {
     marginTop: -SPACE.xxl - SPACE.md,
     borderRadius: RADIUS.card + 4,
@@ -473,7 +479,6 @@ const styles = StyleSheet.create({
     ...SHADOW.card,
   },
   poster: {
-    width: 108,
     aspectRatio: 2 / 3,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.imagePlaceholder,
@@ -498,41 +503,42 @@ const styles = StyleSheet.create({
     marginTop: SPACE.xs,
     color: COLORS.text,
     fontFamily: FONTS.extraBold,
-    fontSize: 22,
-    lineHeight: 27,
+    fontSize: 20,
+    lineHeight: 25,
     letterSpacing: -0.3,
   },
   tabsWrap: {
     flexDirection: 'row',
     marginTop: SPACE.sm,
-    padding: 4,
+    padding: 3,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.surfaceMuted,
   },
   tab: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: RADIUS.card - 4,
+    borderRadius: RADIUS.card - 3,
     paddingHorizontal: SPACE.xs,
   },
   tabOn: {
     backgroundColor: COLORS.surface,
     ...SHADOW.card,
   },
-  tabText: { color: COLORS.textMuted, fontFamily: FONTS.bold, fontSize: 14 },
+  tabText: { color: COLORS.textMuted, fontFamily: FONTS.bold, fontSize: 13 },
   tabTextOn: { color: COLORS.primary },
-  statRow: { flexDirection: 'row', gap: SPACE.xs, marginTop: SPACE.md },
+  statRow: { flexDirection: 'row', gap: SPACE.xs, marginTop: SPACE.sm },
+  // Tuiles compactes (cotes maquette ≈ 56dp de haut).
   statTile: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    minHeight: 74,
-    paddingHorizontal: 10,
-    paddingVertical: SPACE.xs,
+    gap: 5,
+    minHeight: 56,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.surfaceMuted,
   },
@@ -541,18 +547,18 @@ const styles = StyleSheet.create({
   statTilePressed: { opacity: 0.72 },
   statCorner: {
     position: 'absolute',
-    top: 5,
-    right: 6,
-    width: 16,
-    height: 16,
+    top: 4,
+    right: 5,
+    width: 15,
+    height: 15,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primarySoft,
   },
-  statValue: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 14.5, lineHeight: 19 },
-  statSub: { color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 11, lineHeight: 14, marginTop: 1 },
-  statText: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 12, lineHeight: 16 },
+  statValue: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 13.5, lineHeight: 17.5 },
+  statSub: { color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 10.5, lineHeight: 13.5, marginTop: 1 },
+  statText: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 11.5, lineHeight: 15 },
   sectionCard: {
     marginTop: SPACE.sm,
     marginHorizontal: SPACE.md,
@@ -567,31 +573,31 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
   sectionHeadFlush: { paddingHorizontal: SPACE.md },
   sectionChip: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primarySoft,
   },
-  sectionTitle: { flex: 1, minWidth: 0, color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 16.5, lineHeight: 21 },
+  sectionTitle: { flex: 1, minWidth: 0, color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 15.5, lineHeight: 20 },
   infoRow: {
-    minHeight: 40,
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACE.xs,
   },
   infoIcon: {
-    width: 26,
-    height: 26,
+    width: 24,
+    height: 24,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.surfaceMuted,
   },
-  infoLabel: { width: 118, color: COLORS.textMuted, fontFamily: FONTS.semiBold, fontSize: 13, lineHeight: 18 },
-  infoLabelWide: { width: 126 },
-  infoValue: { flex: 1, minWidth: 0, color: COLORS.text, fontFamily: FONTS.bold, fontSize: 13.5, lineHeight: 19 },
+  infoLabel: { width: 112, color: COLORS.textMuted, fontFamily: FONTS.semiBold, fontSize: 12.5, lineHeight: 17 },
+  infoLabelWide: { width: 120 },
+  infoValue: { flex: 1, minWidth: 0, color: COLORS.text, fontFamily: FONTS.bold, fontSize: 13, lineHeight: 18 },
   infoValueRight: { textAlign: 'right', fontFamily: FONTS.semiBold },
   // Disque clair même non cochée : l'anneau reste lisible aussi sur les
   // fonds lavande (file « Continuer le suivi »), pas seulement sur carte.

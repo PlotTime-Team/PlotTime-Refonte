@@ -178,6 +178,19 @@ signalement, temps de jeu) inchangés.
   chevauchant le bas n'en laissait voir que les deux bouts (surtout « À jour »
   en vert) — en haut elle est lisible d'un coup d'œil (`FicheBanner topInset`,
   `accessibilityRole="progressbar"`).
+- **Retours Étienne v5 (2026-07-24) — proportions recalées sur la maquette** :
+  le rendu paraissait « grossier » sur téléphone (éléments massifs + tailles
+  figées pensées 390dp qui se déséquilibraient sur les viewports larges).
+  **Jaquette proportionnelle** (~33 % de la largeur, bornes 116–150dp, cotes
+  maquette) et **bannière proportionnelle** (~56 % de la largeur, plafond 300)
+  au lieu de tailles fixes ; tuiles de stats 74→56dp, segments Suivi 66→54dp,
+  onglets 40→36dp, titres de cartes/sections 16,5→15,5, titre de fiche 22→20,
+  pastilles d'icône 32→28, rangées Informations resserrées, tuile TEMPS DE JEU
+  64→56dp, **badges plateformes compacts** (21dp, parenthèses retirées à
+  l'affichage : « PC (Microsoft Windows) » → « PC », nom complet conservé en
+  accessibilité) ; `maxFontSizeMultiplier` (~1,2) sur les textes structurels
+  pour que la police système Android agrandie ne fasse plus exploser les
+  proportions. Validé aux largeurs 390 et 500 ; Playwright 11/11.
 - **Primitives partagées** (`ScreenHeader`, `SectionHeader`, `TabHeader`,
   en-têtes de bibliothèque) : échelle typographique resserrée et suppression des
   API de sur-titre/sous-titre décoratives, afin d’imposer un titre unique par
