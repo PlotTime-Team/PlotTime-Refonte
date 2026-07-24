@@ -426,6 +426,15 @@ export const SHADOW = {
     shadowRadius: 18,
     elevation: 3,
   },
+  // Ombre discrète pour les petits contrôles (cartes de tri, boutons d'action) :
+  // moins d'épaisseur visuelle que `card`.
+  subtle: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: IS_DARK ? 0.24 : 0.05,
+    shadowRadius: 8,
+    elevation: 1,
+  },
   season: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

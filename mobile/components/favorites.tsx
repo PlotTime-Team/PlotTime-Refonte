@@ -9,12 +9,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, tmdbImage } from '@/lib/api';
 import type { FavSortKey, MediaDto } from '@/lib/types';
-// Page favoris drag & drop : séries/films uniquement (les jeux ont leur page dédiée).
-type FavKind = 'show' | 'movie';
+// Pages favoris (séries / films / jeux) : même machinerie partagée — ajout /
+// retrait, tri, réordonnancement drag & drop, partage.
+export type FavKind = 'show' | 'movie' | 'game';
 import { useAppStore } from '@/lib/store';
 import { COLORS, FONTS, RADIUS, SHADOW, SIZES, SPACE } from '@/lib/theme';
 import { LoadError, EmptyState, Poster } from '@/components/ui';
-import { Grid, LibHeader, LibraryGridCell, type LibraryShow } from '@/components/library';
+import { Grid, LibHeader, LibraryGridCell } from '@/components/library';
 import { Pop, PopIn } from '@/components/anim';
 import { useReduceMotion } from '@/lib/useReduceMotion';
 import { GridSkeleton } from '@/components/skeletons';
@@ -50,22 +51,62 @@ export function sortFavorites<T extends MediaDto>(items: T[], sort: FavSortKey):
   return arr;
 }
 
-// Données des deux pages : bibliothèque complète (pour Ajouter/Supprimer) dont
-// on extrait les favoris. Les séries gardent leur progression (barres).
+// Configuration par type : clé de cache de la bibliothèque (source du pool
+// « Ajouter/retirer » ET des favoris), endpoint de bascule du favori, route de
+// la fiche, familles de requêtes à invalider, pastille de type. Une seule table
+// pour que séries / films / jeux passent par la MÊME machinerie.
+const GAME_GROUPS = ['wishlist', 'owned', 'playing', 'completed', 'abandoned'] as const;
+
+export const FAV_KINDS: FavKind[] = ['show', 'movie', 'game'];
+
+export function favLibKey(kind: FavKind): string[] {
+  return kind === 'movie' ? ['movies', 'library', 'all'] : kind === 'game' ? ['games', 'library'] : ['shows', 'library'];
+}
+function favLibFetch(kind: FavKind): Promise<unknown> {
+  if (kind === 'movie') return api.get('/api/movies/profile?filter=all');
+  if (kind === 'game') return api.get('/api/games');
+  return api.get('/api/shows/library');
+}
+// Aplati la réponse de bibliothèque (formes différentes par type) en une liste
+// d'items. Les jeux peuvent apparaître dans deux groupes (Possédés + statut) :
+// on dédoublonne par id.
+function favLibItems(kind: FavKind, data: unknown): MediaDto[] {
+  if (!data) return [];
+  const d = data as Record<string, MediaDto[] | undefined>;
+  if (kind === 'show') return d.items ?? [];
+  if (kind === 'movie') return [...(d.seen ?? []), ...(d.unseen ?? [])];
+  const seen = new Set<string>();
+  const out: MediaDto[] = [];
+  for (const g of GAME_GROUPS) for (const it of d[g] ?? []) if (!seen.has(it.id)) { seen.add(it.id); out.push(it); }
+  return out;
+}
+// Réécrit la réponse de bibliothèque en appliquant `fn` à chaque item — pour les
+// mises à jour OPTIMISTES (bascule d'un favori, réordonnancement). Conserve la
+// forme propre à chaque type.
+export function mapFavLib(kind: FavKind, data: unknown, fn: (m: MediaDto) => MediaDto): unknown {
+  if (!data) return data;
+  const d = data as Record<string, MediaDto[] | undefined>;
+  if (kind === 'show') return { ...d, items: (d.items ?? []).map(fn) };
+  if (kind === 'movie') return { ...d, seen: (d.seen ?? []).map(fn), unseen: (d.unseen ?? []).map(fn) };
+  const out: Record<string, MediaDto[]> = {};
+  for (const g of GAME_GROUPS) out[g] = (d[g] ?? []).map(fn);
+  return out;
+}
+export function favToggleUrl(kind: FavKind, id: string): string {
+  return kind === 'movie' ? `/api/movies/${id}/favorite` : kind === 'game' ? `/api/games/${id}/favorite` : `/api/shows/${id}/favorite`;
+}
+// Familles de requêtes à rafraîchir après une bascule (liste + profil + fiche).
+export function favInvalidateKeys(kind: FavKind): string[][] {
+  const root = kind === 'movie' ? 'movies' : kind === 'game' ? 'games' : 'shows';
+  return [[root], ['profile'], [kind]];
+}
+const favRoute = (kind: FavKind, id: string) => (kind === 'movie' ? `/show/${id}?type=movie` : kind === 'game' ? `/game/${id}` : `/show/${id}`);
+
+// Données d'une page favoris : la bibliothèque complète (pool « Ajouter/retirer »)
+// dont on extrait les favoris. Une seule requête, partagée avec la bibliothèque.
 export function useFavoritesData(kind: FavKind) {
-  const shows = useQuery({
-    queryKey: ['shows', 'library'],
-    queryFn: () => api.get<{ items: LibraryShow[] }>('/api/shows/library'),
-    enabled: kind === 'show',
-  });
-  const movies = useQuery({
-    queryKey: ['movies', 'library', 'all'],
-    queryFn: () => api.get<{ seen: MediaDto[]; unseen: MediaDto[] }>('/api/movies/profile?filter=all'),
-    enabled: kind === 'movie',
-  });
-  const q = kind === 'show' ? shows : movies;
-  const all: MediaDto[] =
-    kind === 'show' ? shows.data?.items ?? [] : [...(movies.data?.seen ?? []), ...(movies.data?.unseen ?? [])];
+  const q = useQuery({ queryKey: favLibKey(kind), queryFn: () => favLibFetch(kind) });
+  const all = favLibItems(kind, q.data);
   return {
     all,
     favs: all.filter((m) => m.isFavorite),
@@ -98,6 +139,16 @@ const WORDING = {
     pickerEmpty: 'Ajoute des films pour pouvoir les mettre en favori.',
     shareTitle: 'Mes films préférés',
   },
+  game: {
+    pageTitle: 'Jeux préférés',
+    addBtn: 'AJOUTER/RETIRER DES JEUX',
+    pickerTitle: 'Jeux',
+    searchPlaceholder: 'Rechercher des jeux',
+    emptyTitle: 'Aucun jeu en favori',
+    emptyMsg: 'Ajoute tes jeux préférés avec le bouton ci-dessus.',
+    pickerEmpty: 'Ajoute des jeux à ta bibliothèque pour les mettre en favori.',
+    shareTitle: 'Mes jeux préférés',
+  },
 } as const;
 
 // Carte de tri Prisme partagée par les trois pages de favoris (séries / films /
@@ -112,10 +163,10 @@ export function FavSortControl({ label, onPress }: { label: string; onPress: () 
       accessibilityHint="Ouvre les options de tri"
     >
       <View style={styles.sortIcon}>
-        <Feather name="list" size={18} color={COLORS.primary} />
+        <Feather name="list" size={16} color={COLORS.primary} />
       </View>
       <Text style={styles.sortCardValue} numberOfLines={1}>Tri : {label}</Text>
-      <Feather name="chevron-down" size={19} color={COLORS.primary} />
+      <Feather name="chevron-down" size={18} color={COLORS.primary} />
     </Pressable>
   );
 }
@@ -160,7 +211,11 @@ export function FavoritesPage({ kind }: { kind: FavKind }) {
         title={w.pageTitle}
         right={
           <View style={styles.typeIcon} accessible={false}>
-            <Feather name={kind === 'show' ? 'tv' : 'film'} size={19} color={COLORS.primary} />
+            {kind === 'game' ? (
+              <Ionicons name="game-controller-outline" size={19} color={COLORS.primary} />
+            ) : (
+              <Feather name={kind === 'show' ? 'tv' : 'film'} size={18} color={COLORS.primary} />
+            )}
           </View>
         }
       />
@@ -179,7 +234,7 @@ export function FavoritesPage({ kind }: { kind: FavKind }) {
               accessibilityRole="button"
               accessibilityLabel="Ajouter ou retirer des favoris"
             >
-              <Feather name="plus" size={18} color={COLORS.onPrimary} />
+              <Feather name="plus" size={16} color={COLORS.onPrimary} />
               <Text style={styles.addPrimaryText} numberOfLines={1}>Ajouter ou retirer des favoris</Text>
             </Pressable>
             <Pressable
@@ -189,7 +244,7 @@ export function FavoritesPage({ kind }: { kind: FavKind }) {
               accessibilityLabel="Plus d'options"
               accessibilityHint="Réordonner ou partager les favoris"
             >
-              <Feather name="more-horizontal" size={22} color={COLORS.primary} />
+              <Feather name="more-horizontal" size={20} color={COLORS.primary} />
             </Pressable>
           </View>
           <ScrollView
@@ -206,7 +261,7 @@ export function FavoritesPage({ kind }: { kind: FavKind }) {
                     <Poster
                       title={m.title}
                       uri={tmdbImage(m.posterPath)}
-                      onPress={() => router.push(kind === 'movie' ? `/show/${m.id}?type=movie` : `/show/${m.id}`)}
+                      onPress={() => router.push(favRoute(kind, m.id) as never)}
                     />
                   </LibraryGridCell>
                 ))}
@@ -359,14 +414,14 @@ function FavPicker({
   // Bascule OPTIMISTE : le cœur et la grille réagissent au doigt (un appui = un
   // favori), le serveur confirme derrière. Sans cela, l'UI attendait le refetch
   // complet de la bibliothèque (plusieurs secondes) et on tapait 4 fois.
-  const libKey = kind === 'movie' ? ['movies', 'library', 'all'] : ['shows', 'library'];
+  const libKey = favLibKey(kind);
   const toggle = useMutation({
     mutationKey: ['fav-toggle', kind],
-    mutationFn: (id: string) => api.post(kind === 'movie' ? `/api/movies/${id}/favorite` : `/api/shows/${id}/favorite`),
+    mutationFn: (id: string) => api.post(favToggleUrl(kind, id)),
     onMutate: async (id: string) => {
       await qc.cancelQueries({ queryKey: libKey });
       const prev = qc.getQueryData(libKey);
-      const flip = <T extends MediaDto>(m: T): T =>
+      const flip = (m: MediaDto): MediaDto =>
         m.id === id
           ? {
               ...m,
@@ -376,13 +431,7 @@ function FavPicker({
               favoritedAt: m.isFavorite ? null : new Date().toISOString(),
             }
           : m;
-      if (kind === 'movie') {
-        qc.setQueryData<{ seen: MediaDto[]; unseen: MediaDto[] }>(libKey, (d) =>
-          d ? { seen: d.seen.map(flip), unseen: d.unseen.map(flip) } : d,
-        );
-      } else {
-        qc.setQueryData<{ items: LibraryShow[] }>(libKey, (d) => (d ? { items: d.items.map(flip) } : d));
-      }
+      qc.setQueryData(libKey, (d) => mapFavLib(kind, d, flip));
       return { prev };
     },
     onError: (_e: unknown, _id: string, ctx?: { prev?: unknown }) => {
@@ -392,11 +441,10 @@ function FavPicker({
       // N'invalide qu'à la DERNIÈRE mutation en vol : sinon le refetch d'un
       // appui précédent (parti avant le POST suivant) réécrit un état périmé.
       if (qc.isMutating({ mutationKey: ['fav-toggle', kind] }) === 1) {
-        qc.invalidateQueries({ queryKey: [kind === 'movie' ? 'movies' : 'shows'] });
-        qc.invalidateQueries({ queryKey: ['profile'] });
-        // Fiche détaillée (clé singulier ['movie'|'show', id]) : le cœur de la
-        // fiche doit refléter le favori basculé depuis cette grille.
-        qc.invalidateQueries({ queryKey: [kind === 'movie' ? 'movie' : 'show'] });
+        // Listes (racine), profil, et fiche détaillée (clé singulier
+        // ['movie'|'show'|'game', id]) : le cœur de la fiche doit refléter le
+        // favori basculé depuis cette grille.
+        for (const key of favInvalidateKeys(kind)) qc.invalidateQueries({ queryKey: key });
       }
     },
   });
@@ -475,58 +523,60 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.control,
     backgroundColor: COLORS.primarySoft,
   },
-  // Carte de tri (partagée avec « Jeux préférés » via FavSortControl).
+  // Carte de tri (partagée avec « Jeux préférés » via FavSortControl) —
+  // affinée (retour Étienne : moins épaisse) : ~50dp, pastille 32, bord fin.
   sortCard: {
-    minHeight: 68,
+    minHeight: 50,
     alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACE.sm,
+    gap: SPACE.xs + 2,
     marginHorizontal: SPACE.md,
     marginTop: SPACE.md,
-    paddingHorizontal: SPACE.md,
-    borderWidth: 1,
+    paddingLeft: SPACE.xs + 2,
+    paddingRight: SPACE.sm,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.borderLight,
-    borderRadius: RADIUS.card,
+    borderRadius: RADIUS.control,
     backgroundColor: COLORS.surface,
-    ...SHADOW.card,
+    ...SHADOW.subtle,
   },
   sortIcon: {
-    width: SIZES.touch,
-    height: SIZES.touch,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: RADIUS.control,
+    borderRadius: RADIUS.control - 2,
     backgroundColor: COLORS.primarySoft,
   },
-  sortCardValue: { flex: 1, minWidth: 0, color: COLORS.text, fontSize: 15, lineHeight: 21, fontFamily: FONTS.bold },
+  sortCardValue: { flex: 1, minWidth: 0, color: COLORS.text, fontSize: 14, lineHeight: 19, fontFamily: FONTS.bold },
   controlPressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
   // Rangée d'actions : bouton primaire « Ajouter ou retirer » + « ⋯ ».
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginHorizontal: SPACE.md, marginTop: SPACE.sm },
   addPrimary: {
     flex: 1,
-    minHeight: 52,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACE.xs,
     paddingHorizontal: SPACE.md,
-    borderRadius: RADIUS.card,
+    borderRadius: RADIUS.control,
     backgroundColor: COLORS.primary,
-    ...SHADOW.card,
+    ...SHADOW.subtle,
   },
   addPrimaryPressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
-  addPrimaryText: { color: COLORS.onPrimary, fontSize: 14, lineHeight: 19, fontFamily: FONTS.extraBold, letterSpacing: 0.2 },
+  addPrimaryText: { color: COLORS.onPrimary, fontSize: 13.5, lineHeight: 18, fontFamily: FONTS.extraBold, letterSpacing: 0.2 },
   moreBtn: {
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.borderLight,
-    borderRadius: RADIUS.card,
+    borderRadius: RADIUS.control,
     backgroundColor: COLORS.surface,
-    ...SHADOW.card,
+    ...SHADOW.subtle,
   },
   gridScroll: { paddingTop: SPACE.md, paddingBottom: SPACE.xl },
   emptyScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACE.xl },

@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Image } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { goBack } from '@/lib/nav';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,14 +12,14 @@ import { DragGrid } from '@/components/DragGrid';
 import { AnimatedFill, Pop } from '@/components/anim';
 import { GridSkeleton } from '@/components/skeletons';
 import { LoadError, EmptyState } from '@/components/ui';
-import { useFavoritesData, sortFavorites } from '@/components/favorites';
+import { useFavoritesData, sortFavorites, favLibKey, mapFavLib, type FavKind } from '@/components/favorites';
 
 const CELL_H = CELL_W * 1.5;
 
 // L'ordre est sauvegardé à chaque dépôt ; l'action de validation referme l'écran.
 export default function ReorderFavoritesScreen() {
   const { type } = useLocalSearchParams<{ type?: string }>();
-  const kind = type === 'movie' ? 'movie' : 'show';
+  const kind: FavKind = type === 'movie' ? 'movie' : type === 'game' ? 'game' : 'show';
   const qc = useQueryClient();
   const scrollRef = useRef<ScrollView>(null);
   const scrollOffset = useRef(0);
@@ -34,26 +34,21 @@ export default function ReorderFavoritesScreen() {
   // (la page « préférés » l'affiche dès le retour), et on n'invalide qu'à la
   // DERNIÈRE sauvegarde en vol — sinon le refetch d'un dépôt précédent, parti
   // avant le POST suivant, réécrivait l'ancien ordre (« changements perdus »).
-  const libKey = kind === 'movie' ? ['movies', 'library', 'all'] : ['shows', 'library'];
+  const libKey = favLibKey(kind);
+  const rootKey = kind === 'movie' ? 'movies' : kind === 'game' ? 'games' : 'shows';
   const save = useMutation({
     mutationKey: ['fav-reorder', kind],
     mutationFn: (ids: string[]) => api.post('/api/profile/favorites/reorder', { type: kind, ids }),
     onMutate: async (ids: string[]) => {
       await qc.cancelQueries({ queryKey: libKey });
       const pos = new Map(ids.map((id, i) => [id, i]));
-      const patch = <T extends MediaDto>(m: T): T =>
+      const patch = (m: MediaDto): MediaDto =>
         pos.has(m.id) ? { ...m, favoriteOrder: pos.get(m.id)! } : m;
-      if (kind === 'movie') {
-        qc.setQueryData<{ seen: MediaDto[]; unseen: MediaDto[] }>(libKey, (d) =>
-          d ? { seen: d.seen.map(patch), unseen: d.unseen.map(patch) } : d,
-        );
-      } else {
-        qc.setQueryData<{ items: LibraryShow[] }>(libKey, (d) => (d ? { items: d.items.map(patch) } : d));
-      }
+      qc.setQueryData(libKey, (d) => mapFavLib(kind, d, patch));
     },
     onSettled: () => {
       if (qc.isMutating({ mutationKey: ['fav-reorder', kind] }) === 1) {
-        qc.invalidateQueries({ queryKey: [kind === 'movie' ? 'movies' : 'shows'] });
+        qc.invalidateQueries({ queryKey: [rootKey] });
         qc.invalidateQueries({ queryKey: ['profile'] });
       }
     },
@@ -106,7 +101,7 @@ export default function ReorderFavoritesScreen() {
                 data={initial}
                 keyOf={(m) => m.id}
                 cellHeight={CELL_H}
-                renderItem={(m) => <ReorderCell media={m} isShow={kind === 'show'} />}
+                renderItem={(m) => <ReorderCell media={m} kind={kind} />}
                 onReorder={(items) => save.mutate(items.map((m) => m.id))}
                 onDragStateChange={setScrollLocked}
                 scrollRef={scrollRef}
@@ -121,10 +116,10 @@ export default function ReorderFavoritesScreen() {
 }
 
 // Affiche seule : l'écran est dédié au glisser-déposer.
-function ReorderCell({ media, isShow }: { media: MediaDto; isShow: boolean }) {
+function ReorderCell({ media, kind }: { media: MediaDto; kind: FavKind }) {
   const uri = tmdbImage(media.posterPath);
   const progress = (media as LibraryShow).progress;
-  const started = isShow && progress && progress.watched > 0;
+  const started = kind === 'show' && progress && progress.watched > 0;
   const done = started && progress.total > 0 && progress.watched >= progress.total;
   const pct = started && progress.total > 0 ? Math.min(100, (progress.watched / progress.total) * 100) : 0;
   return (
@@ -140,7 +135,11 @@ function ReorderCell({ media, isShow }: { media: MediaDto; isShow: boolean }) {
           <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         ) : (
           <View style={styles.posterEmpty}>
-            <Feather name={isShow ? 'tv' : 'film'} size={24} color={COLORS.primary} />
+            {kind === 'game' ? (
+              <Ionicons name="game-controller-outline" size={24} color={COLORS.primary} />
+            ) : (
+              <Feather name={kind === 'show' ? 'tv' : 'film'} size={24} color={COLORS.primary} />
+            )}
             <Text style={styles.posterTitle} numberOfLines={3}>{media.title}</Text>
           </View>
         )}

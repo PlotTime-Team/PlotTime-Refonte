@@ -110,6 +110,29 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 ## Journal des modifications
 
+### 2026-07-24 — Claude/Étienne : favoris jeux à parité complète + contrôles affinés
+Suite du chantier favoris. Deux retours d'Étienne :
+1. **Parité fonctionnelle des Jeux préférés** avec Séries/Films : la page Jeux
+   n'avait ni ajout/retrait en masse, ni réordonnancement, ni partage (favori
+   géré uniquement depuis la fiche). Elle passe désormais par la **même
+   machinerie partagée** (`FavoritesPage kind="game"`) : bouton « Ajouter ou
+   retirer des favoris » (recherche + cœurs sur toute la bibliothèque de jeux),
+   menu « ⋯ » (Réordonner en drag & drop / Partager), tri persisté.
+   - Serveur (petits ajouts, **redéploiement requis**) : `/api/games` expose
+     `type`, `favoriteOrder`, `favoritedAt` (le jeu portait déjà l'ordre en
+     base) ; l'endpoint `/api/profile/favorites/reorder` accepte `type=game`.
+   - La page Jeux dérive maintenant pool ET favoris de `/api/games` (comme les
+     séries dérivent de `/api/shows/library`) — bascule optimiste, cache partagé
+     avec la bibliothèque Jeux. `useFavoritesData`, le sélecteur et l'écran de
+     réordonnancement sont généralisés aux 3 types (helpers `favLibKey`,
+     `mapFavLib`, `favToggleUrl`, `favInvalidateKeys`).
+2. **Contrôles affinés** (trop épais) : carte de tri ~50 dp (au lieu de 68),
+   pastille d'icône 32, bouton d'action ~44 dp, bords fins (hairline), nouvelle
+   ombre `SHADOW.subtle` plus discrète, textes/icônes légèrement réduits.
+Vérifié : parité Jeux 3/3 (bouton, POST `/api/games/:id/favorite`, ⋯ →
+réordonner `type=game`), captures 360 dp, suites fiches 11/11, jeux 7/7,
+retour Explorer. Rien de fonctionnel retiré.
+
 ### 2026-07-24 — Claude/Étienne : favoris — les 3 pages (Séries / Films / Jeux) unifiées sur la refonte Prisme
 Les pages **Séries préférées** et **Films préférées** étaient restées sur
 l'ancien design TV Time (bouton jaune « AJOUTER/SUPPRIMER », lien bleu « Tri »,

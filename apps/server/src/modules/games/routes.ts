@@ -30,15 +30,19 @@ export async function ensureGameFromIgdb(igdbId: string) {
   return created;
 }
 
-function serializeGame(m: { id: string; title: string; posterPath: string | null; backdropPath?: string | null; year: number | null; voteAverage: number | null; igdbId: string | null; game?: { platforms: string | null } | null }, status?: { status: string; playtimeMinutes: number | null; isOwned: boolean; isFavorite?: boolean; createdAt?: Date | null } | null) {
+function serializeGame(m: { id: string; title: string; posterPath: string | null; backdropPath?: string | null; year: number | null; voteAverage: number | null; igdbId: string | null; game?: { platforms: string | null } | null }, status?: { status: string; playtimeMinutes: number | null; isOwned: boolean; isFavorite?: boolean; favoriteOrder?: number | null; favoritedAt?: Date | null; createdAt?: Date | null } | null) {
   return {
-    id: m.id, title: m.title, posterPath: m.posterPath, backdropPath: m.backdropPath ?? null, year: m.year,
+    id: m.id, type: 'game' as const, title: m.title, posterPath: m.posterPath, backdropPath: m.backdropPath ?? null, year: m.year,
     voteAverage: m.voteAverage, igdbId: m.igdbId,
     platforms: m.game?.platforms ?? null,
     userStatus: status?.status ?? null,
     isOwned: status?.isOwned ?? false,
     // Exposé pour la carte « en vedette » de l'Accueil (sélection par préférence).
     isFavorite: status?.isFavorite ?? false,
+    // Ordre + date des favoris : alimentent le tri des « Jeux préférés » (parité
+    // séries/films — la page favoris dérive désormais de /api/games).
+    favoriteOrder: status?.favoriteOrder ?? null,
+    favoritedAt: status?.favoritedAt ? status.favoritedAt.toISOString() : null,
     playtimeMinutes: status?.playtimeMinutes ?? null,
     // Date d'ajout à la bibliothèque : alimente le tri « Dernier ajout »
     // (bibliothèque Jeux, côté mobile). Null hors bibliothèque (recherche).

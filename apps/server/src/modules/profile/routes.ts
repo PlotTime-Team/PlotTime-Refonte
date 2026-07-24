@@ -216,7 +216,7 @@ export async function profileRoutes(app: FastifyInstance): Promise<void> {
   // complète des ids dans le nouvel ordre et réécrit les positions.
   app.post('/api/profile/favorites/reorder', async (request, reply) => {
     const body = z
-      .object({ type: z.enum(['show', 'movie']), ids: z.array(z.string()).max(1000) })
+      .object({ type: z.enum(['show', 'movie', 'game']), ids: z.array(z.string()).max(1000) })
       .parse(request.body);
     const statuses = await prisma.userMediaStatus.findMany({
       where: { userId: request.userId, isFavorite: true, media: { type: body.type } },
