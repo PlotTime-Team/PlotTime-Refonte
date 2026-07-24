@@ -110,6 +110,32 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 ## Journal des modifications
 
+### 2026-07-24 — Claude/Étienne : fiches v6 — spec maquette MESURÉE (fin du delta) + doublon genres retiré
+Le correctif v5 semblait « n'avoir rien changé » sur le téléphone d'Étienne :
+cause identifiée par mesure au pixel (calibrage sur la barre de progression de
+5 dp) — son Oppo Find X9 Pro rend l'app à **~355 dp de large**, où la formule
+proportionnelle de jaquette v5 redonnait ~117 dp ≈ l'ancienne taille fixe
+(116) : un no-op mathématique. Les vrais écarts avec la maquette étaient
+ailleurs ; tous recalés sur des **mesures** de la maquette (converties en dp) :
+- **Suivi** (`StatusLine`, fiches série/film/jeu) : les gros segments empilés
+  (54 dp, dans un conteneur) deviennent des **pilules fines en ligne** (36 dp,
+  icône à gauche du libellé, posées sur la carte, pilule active violette
+  pleine) — l'écart le plus visible. Même API/accessibilité (radios), aucune
+  logique changée.
+- **Gouttières et cartes** : marges latérales 16 → **12 dp**, padding interne
+  16 → **14 dp** (cartes d'identité, sections, Suivi, possession, progression,
+  épisodes) — l'app « respire » comme la maquette.
+- **Tuiles de stats** : 64 dp de haut, valeurs en Bold 13,5 resserré (au lieu
+  d'ExtraBold) → « 2 saisons », « Note TMDb », « Note joueurs » tiennent sans
+  troncature à 360 dp ; icônes de tuiles réduites (16/15) ; texte genres 11,5
+  (« Adventure » sans césure).
+- **Jaquette** : 30,5 % de la largeur (bornes 104–140 dp) — désormais
+  réellement plus petite à 355 dp.
+- **Fiche jeu** : retrait de la ligne de genres sous le titre (doublon de la
+  tuile genres) → l'espace libéré profite aux badges de plateformes.
+Vérifié à 360 et 390 dp (captures) + suites Playwright : fiches 11/11,
+retour Explorer, bibliothèque Jeux 7/7. Aucun changement fonctionnel.
+
 ### 2026-07-24 — Claude/Étienne : filtre/tri de la bibliothèque Jeux (+ plateforme) persisté et indépendant
 La bibliothèque Jeux du Profil (« voir tout ») disposait de ses sections
 (Voulus / Possédés / En cours / Terminés / Abandonnés) mais d'AUCUN filtre/tri,

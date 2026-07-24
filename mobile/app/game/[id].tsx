@@ -348,7 +348,7 @@ export default function GameDetail() {
                   const label = critics ? 'Note presse' : 'Note joueurs';
                   return (
                     <StatTile
-                      icon={<Ionicons name="star" size={19} color={COLORS.tertiary} />}
+                      icon={<Ionicons name="star" size={16} color={COLORS.tertiary} />}
                       value={`${rating5(score, 100)}/5`}
                       sub={label}
                       a11y={`${label} ${rating5(score, 100)} sur 5${both ? `. Afficher la note ${critics ? 'des joueurs' : 'de la presse'}` : ''}`}
@@ -359,14 +359,14 @@ export default function GameDetail() {
                 })() : null}
                 {genresTxt ? (
                   <StatTile
-                    icon={<Ionicons name="game-controller-outline" size={19} color={COLORS.primary} />}
+                    icon={<Ionicons name="game-controller-outline" size={16} color={COLORS.primary} />}
                     text={game.genres!.split(',').map((g) => g.trim()).filter(Boolean).slice(0, 2).join('\n')}
                     a11y={`Genres : ${genresTxt}`}
                   />
                 ) : null}
                 {releaseTxt ? (
                   <StatTile
-                    icon={<Feather name="calendar" size={18} color={COLORS.primary} />}
+                    icon={<Feather name="calendar" size={15} color={COLORS.primary} />}
                     value={releaseDay ?? releaseTxt}
                     sub={releaseYear ?? undefined}
                     a11y={`Sortie le ${releaseTxt}`}
@@ -375,7 +375,6 @@ export default function GameDetail() {
               </StatTiles>
             }
           >
-            {genresTxt ? <Text style={styles.identityMeta} maxFontSizeMultiplier={1.2}>{genresTxt}</Text> : null}
             {platformList.length ? (
               <View
                 style={styles.platRow}
@@ -1400,14 +1399,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.pageMuted,
     paddingBottom: SPACE.sm,
   },
-  // Méta de la carte d'identité : « Aventure • RPG » puis « Sortie le … ».
-  identityMeta: {
-    marginTop: SPACE.xs,
-    color: COLORS.textMuted,
-    fontFamily: FONTS.semiBold,
-    fontSize: 12.5,
-    lineHeight: 17,
-  },
   // Badges de plateformes (PJ Étienne, adaptés à la DA) : pilules lavande
   // COMPACTES (noms courts, parenthèses retirées), retour à la ligne libre.
   platRow: {
@@ -1432,8 +1423,8 @@ const styles = StyleSheet.create({
   // sections de CONTENU passent par FicheSection (pastille d'icône).
   trackCard: {
     marginTop: SPACE.sm,
-    marginHorizontal: SPACE.md,
-    padding: SPACE.md,
+    marginHorizontal: SPACE.sm,
+    padding: 14,
     borderRadius: RADIUS.sheet,
     backgroundColor: COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,

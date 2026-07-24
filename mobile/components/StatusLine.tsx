@@ -3,10 +3,10 @@ import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, FONTS, RADIUS, SPACE } from '@/lib/theme';
 
-// Ligne de suivi partagée (fiches jeu / série / film / animé) — refonte
-// maquettes 2026-07-23 : contrôle SEGMENTÉ sur toute la largeur (icône au-
-// dessus du libellé), segment actif en pilule violette pleine. Même API
-// qu'avant (options/value/onChange/allowDeselect) : aucune logique changée.
+// Ligne de suivi partagée (fiches jeu / série / film / animé) — recalée sur la
+// maquette (mesures 2026-07-24) : PILULES FINES EN LIGNE (icône à gauche du
+// libellé, ~36dp), posées directement sur la carte (pas de conteneur), pilule
+// active violette pleine. Même API qu'avant : aucune logique changée.
 // `allowDeselect` : re-taper le statut actif le retire (onChange(null)) —
 // activé uniquement quand l'API le permet sans effet destructeur.
 export type StatusOption = { value: string; label: string; icon?: keyof typeof Feather.glyphMap };
@@ -38,7 +38,7 @@ export function StatusLine({
 }) {
   return (
     <View
-      style={styles.track}
+      style={styles.row}
       accessibilityRole="radiogroup"
       accessibilityLabel={accessibilityLabel}
     >
@@ -49,10 +49,10 @@ export function StatusLine({
           <Pressable
             key={o.value}
             style={({ pressed }) => [
-              styles.segment,
-              selected && styles.segmentSel,
-              pressed && !disabled && styles.segmentPressed,
-              disabled && styles.segmentDisabled,
+              styles.pill,
+              selected && styles.pillSel,
+              pressed && !disabled && styles.pillPressed,
+              disabled && styles.pillDisabled,
             ]}
             onPress={() => {
               if (selected) {
@@ -62,6 +62,9 @@ export function StatusLine({
               onChange(o.value);
             }}
             disabled={disabled}
+            // Pilules fines (36) : hitSlop vertical pour garder une cible
+            // tactile confortable (~44) sans épaissir la ligne.
+            hitSlop={{ top: 4, bottom: 4 }}
             accessibilityRole="radio"
             accessibilityLabel={o.label}
             accessibilityHint={
@@ -71,11 +74,11 @@ export function StatusLine({
           >
             <Feather
               name={icon}
-              size={16}
+              size={14}
               color={selected ? COLORS.onPrimary : COLORS.textMuted}
             />
             <Text
-              style={[styles.segmentText, selected && styles.segmentTextSel]}
+              style={[styles.pillText, selected && styles.pillTextSel]}
               numberOfLines={1}
               maxFontSizeMultiplier={1.2}
             >
@@ -89,41 +92,39 @@ export function StatusLine({
 }
 
 const styles = StyleSheet.create({
-  track: {
+  row: {
     flexDirection: 'row',
-    padding: 3,
-    gap: 2,
-    borderRadius: RADIUS.card,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    minHeight: 36,
+    paddingHorizontal: SPACE.sm - 1,
+    borderRadius: RADIUS.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.borderLight,
     backgroundColor: COLORS.surfaceMuted,
   },
-  // Segments compacts (cotes maquette ≈ 50dp au total).
-  segment: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    paddingHorizontal: 2,
-    paddingVertical: 6,
-    borderRadius: RADIUS.card - 3,
-  },
-  segmentSel: {
+  pillSel: {
+    borderColor: COLORS.primary,
     backgroundColor: COLORS.primary,
   },
-  segmentPressed: {
+  pillPressed: {
     opacity: 0.78,
   },
-  segmentDisabled: {
+  pillDisabled: {
     opacity: 0.48,
   },
-  segmentText: {
-    maxWidth: '100%',
+  pillText: {
     color: COLORS.text,
     fontFamily: FONTS.semiBold,
-    fontSize: 11.5,
+    fontSize: 12,
   },
-  segmentTextSel: {
+  pillTextSel: {
     color: COLORS.onPrimary,
     fontFamily: FONTS.bold,
   },

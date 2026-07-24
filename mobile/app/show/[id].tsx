@@ -393,7 +393,7 @@ export default function ShowDetail() {
             <StatTiles>
               {media.voteAverage ? (
                 <StatTile
-                  icon={<Ionicons name="star" size={19} color={COLORS.tertiary} />}
+                  icon={<Ionicons name="star" size={16} color={COLORS.tertiary} />}
                   value={`${rating5(media.voteAverage, 10)}/5`}
                   sub="Note TMDb"
                   a11y={`Note ${rating5(media.voteAverage, 10)} sur 5`}
@@ -401,7 +401,7 @@ export default function ShowDetail() {
               ) : null}
               {genresTxt ? (
                 <StatTile
-                  icon={<MaterialCommunityIcons name="drama-masks" size={19} color={COLORS.primary} />}
+                  icon={<MaterialCommunityIcons name="drama-masks" size={16} color={COLORS.primary} />}
                   text={genresTxt}
                   a11y={`Genres : ${genresTxt}`}
                 />
@@ -409,7 +409,7 @@ export default function ShowDetail() {
               {isMovie
                 ? (media.runtime ? (
                     <StatTile
-                      icon={<Feather name="clock" size={18} color={COLORS.primary} />}
+                      icon={<Feather name="clock" size={15} color={COLORS.primary} />}
                       value={fmtRuntime(media.runtime)}
                       sub="Durée"
                       a11y={`Durée ${fmtRuntime(media.runtime)}`}
@@ -417,7 +417,7 @@ export default function ShowDetail() {
                   ) : null)
                 : (seasonsCount ? (
                     <StatTile
-                      icon={<Ionicons name="layers-outline" size={18} color={COLORS.primary} />}
+                      icon={<Ionicons name="layers-outline" size={16} color={COLORS.primary} />}
                       value={`${seasonsCount} saison${seasonsCount > 1 ? 's' : ''}`}
                       sub={totalEps ? `${totalEps} épisode${totalEps > 1 ? 's' : ''}` : undefined}
                       a11y={`${seasonsCount} saisons${totalEps ? `, ${totalEps} épisodes` : ''}`}
@@ -1989,8 +1989,8 @@ const styles = StyleSheet.create({
   // pastille — les sections de CONTENU passent par FicheSection (pastille).
   trackCard: {
     marginTop: SPACE.sm,
-    marginHorizontal: SPACE.md,
-    padding: SPACE.md,
+    marginHorizontal: SPACE.sm,
+    padding: 14,
     borderRadius: RADIUS.sheet,
     backgroundColor: COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
@@ -2083,8 +2083,8 @@ const styles = StyleSheet.create({
   // Carte « Ma progression ».
   progressCard: {
     marginTop: SPACE.sm,
-    marginHorizontal: SPACE.md,
-    padding: SPACE.md,
+    marginHorizontal: SPACE.sm,
+    padding: 14,
     borderRadius: RADIUS.sheet,
     backgroundColor: COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
@@ -2102,8 +2102,8 @@ const styles = StyleSheet.create({
   // Carte « Épisodes ».
   episodesCard: {
     marginTop: SPACE.sm,
-    marginHorizontal: SPACE.md,
-    padding: SPACE.md,
+    marginHorizontal: SPACE.sm,
+    padding: 14,
     borderRadius: RADIUS.sheet,
     backgroundColor: COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,

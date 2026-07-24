@@ -140,7 +140,7 @@ export function FicheIdentity({
   tiles?: React.ReactNode;
 }) {
   const { width } = useWindowDimensions();
-  const frameW = Math.min(150, Math.max(116, Math.round(Math.min(width, SIZES.contentMax) * 0.33)));
+  const frameW = Math.min(140, Math.max(104, Math.round(Math.min(width, SIZES.contentMax) * 0.305)));
   return (
     <View style={styles.identityCard}>
       <View style={styles.identityRow}>
@@ -459,8 +459,8 @@ const styles = StyleSheet.create({
   bannerProgressFill: { height: '100%', borderTopRightRadius: 3, borderBottomRightRadius: 3 },
   identityCard: {
     marginTop: -SPACE.xxl,
-    marginHorizontal: SPACE.md,
-    padding: SPACE.md,
+    marginHorizontal: SPACE.sm,
+    padding: 14,
     borderRadius: RADIUS.sheet,
     backgroundColor: COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   },
   tabText: { color: COLORS.textMuted, fontFamily: FONTS.bold, fontSize: 13 },
   tabTextOn: { color: COLORS.primary },
-  statRow: { flexDirection: 'row', gap: SPACE.xs, marginTop: SPACE.sm },
+  statRow: { flexDirection: 'row', gap: 10, marginTop: SPACE.sm },
   // Tuiles compactes (cotes maquette ≈ 56dp de haut).
   statTile: {
     flex: 1,
@@ -536,9 +536,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    minHeight: 56,
+    minHeight: 64,
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.surfaceMuted,
   },
@@ -556,13 +556,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.primarySoft,
   },
-  statValue: { color: COLORS.text, fontFamily: FONTS.extraBold, fontSize: 13.5, lineHeight: 17.5 },
-  statSub: { color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 10.5, lineHeight: 13.5, marginTop: 1 },
-  statText: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 11.5, lineHeight: 15 },
+  statValue: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 13.5, lineHeight: 17.5, letterSpacing: -0.2 },
+  statSub: { color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 11, lineHeight: 14.5, marginTop: 1 },
+  // 11.5 + interlettre resserré : « Adventure » tient sans césure dans une
+  // tuile de ~96dp à 360dp de large (icône 16 à gauche).
+  statText: { color: COLORS.text, fontFamily: FONTS.bold, fontSize: 11.5, lineHeight: 15.5, letterSpacing: -0.2 },
   sectionCard: {
     marginTop: SPACE.sm,
-    marginHorizontal: SPACE.md,
-    padding: SPACE.md,
+    marginHorizontal: SPACE.sm,
+    padding: 14,
     borderRadius: RADIUS.sheet,
     backgroundColor: COLORS.surface,
     borderWidth: StyleSheet.hairlineWidth,
@@ -571,7 +573,7 @@ const styles = StyleSheet.create({
   },
   sectionFlush: { paddingHorizontal: 0 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
-  sectionHeadFlush: { paddingHorizontal: SPACE.md },
+  sectionHeadFlush: { paddingHorizontal: 14 },
   sectionChip: {
     width: 28,
     height: 28,
