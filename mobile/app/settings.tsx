@@ -788,9 +788,27 @@ function AppTab() {
         <Row label="Conditions d'utilisation" onPress={() => openExternal(`${LEGAL_BASE}/terms`)} external />
         <View style={styles.block}>
           <Text style={styles.attribution}>Les informations sur les œuvres proviennent de :</Text>
-          <Text style={styles.attribution}>This product uses the TMDB API but is not endorsed or certified by TMDB.</Text>
-          <Text style={styles.attribution}>Metadata provided by TheTVDB. Please consider adding missing information or subscribing.</Text>
-          <Text style={styles.attribution}>Game data provided by IGDB.com.</Text>
+          <Text
+            style={[styles.attribution, styles.attributionLink]}
+            accessibilityRole="link"
+            onPress={() => openExternal('https://www.themoviedb.org/')}
+          >
+            This product uses the TMDB API but is not endorsed or certified by TMDB.
+          </Text>
+          <Text
+            style={[styles.attribution, styles.attributionLink]}
+            accessibilityRole="link"
+            onPress={() => openExternal('https://thetvdb.com/')}
+          >
+            Metadata provided by TheTVDB. Please consider adding missing information or subscribing.
+          </Text>
+          <Text
+            style={[styles.attribution, styles.attributionLink]}
+            accessibilityRole="link"
+            onPress={() => openExternal('https://www.igdb.com/')}
+          >
+            Game data provided by IGDB.com.
+          </Text>
         </View>
       </Section>
 
@@ -961,4 +979,5 @@ const styles = StyleSheet.create({
   version: { textAlign: 'center', paddingVertical: SPACE.lg, fontSize: 13, fontFamily: FONTS.bold, color: COLORS.textMuted, letterSpacing: 1 },
   note: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.textMuted, paddingTop: SPACE.sm, lineHeight: 18, borderTopWidth: 1, borderTopColor: COLORS.borderLight, marginTop: 0 },
   attribution: { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.textMuted, lineHeight: 17, marginBottom: 6 },
+  attributionLink: { color: COLORS.secondary, textDecorationLine: 'underline' },
 });
