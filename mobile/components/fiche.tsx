@@ -69,17 +69,22 @@ export function FicheTopActions({
 
 // Bannière pleine largeur qui DÉFILE avec le contenu (plus d'en-tête
 // rétractable). Léger voile en bas pour asseoir la carte d'identité qui la
-// chevauche ; barre de progression optionnelle au ras du bas (séries).
+// chevauche. Barre de progression optionnelle (séries) épinglée EN HAUT, juste
+// sous la zone système (`topInset`) : la carte d'identité chevauchant le bas
+// masquait la barre au ras du bas (on n'en voyait que les deux bouts) ; en haut
+// elle est visible bord à bord d'un coup d'œil (retour Étienne 2026-07-24).
 export function FicheBanner({
   uri,
   height,
   fallback,
   progress,
+  topInset = 0,
 }: {
   uri: string | null;
   height: number;
   fallback: React.ReactNode;
   progress?: { pct: number; fill: string; track: string } | null;
+  topInset?: number;
 }) {
   return (
     <View style={[styles.banner, { height }]}>
@@ -99,7 +104,12 @@ export function FicheBanner({
         pointerEvents="none"
       />
       {progress ? (
-        <View style={[styles.bannerProgressTrack, { backgroundColor: progress.track }]}>
+        <View
+          style={[styles.bannerProgressTrack, { top: topInset, backgroundColor: progress.track }]}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 0, max: 100, now: Math.round(progress.pct) }}
+        >
           <View style={[styles.bannerProgressFill, { width: `${Math.min(100, Math.max(0, progress.pct))}%`, backgroundColor: progress.fill }]} />
         </View>
       ) : null}
@@ -438,8 +448,10 @@ const styles = StyleSheet.create({
     bottom: -98,
     left: -42,
   },
-  bannerProgressTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 4 },
-  bannerProgressFill: { height: '100%' },
+  // Barre de progression EN HAUT de la bannière (bord à bord, sous la zone
+  // système) : 5px, coins arrondis au remplissage pour un rendu net.
+  bannerProgressTrack: { position: 'absolute', left: 0, right: 0, height: 5 },
+  bannerProgressFill: { height: '100%', borderTopRightRadius: 3, borderBottomRightRadius: 3 },
   identityCard: {
     marginTop: -SPACE.xxl,
     marginHorizontal: SPACE.md,

@@ -284,8 +284,9 @@ export default function GameDetail() {
   }, [feedIgdbId, feedStatus]);
 
   // Bannière (refonte 2026-07-23) : mêmes cotes que les fiches série/film —
-  // elle défile avec le contenu, les boutons restent épinglés.
-  const heroH = insets.top + (width >= 700 ? 252 : 196);
+  // elle défile avec le contenu, les boutons restent épinglés. Légèrement
+  // rehaussée (retour Étienne 2026-07-24 : « en voir un peu plus »).
+  const heroH = insets.top + (width >= 700 ? 276 : 220);
 
   if (detail.isLoading) return <FicheSkeleton heroHeight={heroH} />;
   if (!detail.data) return <LoadError onRetry={detail.refetch} busy={detail.isRefetching} />;

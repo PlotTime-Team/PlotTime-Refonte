@@ -294,7 +294,8 @@ export default function ShowDetail() {
 
   // Bannière (refonte 2026-07-23) : elle DÉFILE avec le contenu — plus d'en-
   // tête rétractable ; les boutons retour / cœur / menu restent épinglés.
-  const heroH = insets.top + (width >= 700 ? 252 : 196);
+  // Légèrement rehaussée (retour Étienne 2026-07-24 : « en voir un peu plus »).
+  const heroH = insets.top + (width >= 700 ? 276 : 220);
 
   // Explorer : dès que ce titre a un statut (déjà vu / à voir / en cours…), le
   // marquer « suivi cette session » pour que le deck figé de l'Explorer cesse
@@ -315,7 +316,7 @@ export default function ShowDetail() {
   const media: MediaDto = detail.data.media;
   const isFollowed = media.userStatus != null;
 
-  // Barre de progression au ras du bas de la bannière : épisodes diffusés vus /
+  // Barre de progression EN HAUT de la bannière : épisodes diffusés vus /
   // diffusés (hors spéciaux), colorée par STATUT comme dans les bibliothèques
   // du profil (jaune En cours, vert À jour, bleu Terminé, orange À voir, rouge
   // Arrêté) — violet Prisme pour « En cours » sur la fiche.
@@ -365,6 +366,7 @@ export default function ShowDetail() {
         height={heroH}
         fallback={<Feather name={isMovie ? 'film' : 'tv'} size={64} color="rgba(255,255,255,0.34)" />}
         progress={heroProg}
+        topInset={insets.top}
       />
       <FicheIdentity
         posterUri={tmdbImage(media.posterPath, 'w342')}
@@ -373,54 +375,58 @@ export default function ShowDetail() {
         badge={isMovie ? 'FILM' : 'SÉRIE'}
         title={media.title}
         tiles={
-          <StatTiles>
-            {media.voteAverage ? (
-              <StatTile
-                icon={<Ionicons name="star" size={21} color={COLORS.tertiary} />}
-                value={`${rating5(media.voteAverage, 10)}/5`}
-                sub="Note TMDb"
-                a11y={`Note ${rating5(media.voteAverage, 10)} sur 5`}
+          <>
+            {/* Onglets en PLEINE LARGEUR sous la carte d'identité (série) :
+                comblent le vide sous la jaquette (retour Étienne 2026-07-24). */}
+            {!isMovie ? (
+              <FicheTabs
+                options={[
+                  { value: 'À PROPOS', label: 'À propos' },
+                  { value: 'ÉPISODES', label: 'Épisodes' },
+                ]}
+                value={tab}
+                onChange={setTab}
+                accessibilityLabel="Sections de la fiche"
               />
             ) : null}
-            {genresTxt ? (
-              <StatTile
-                icon={<MaterialCommunityIcons name="drama-masks" size={21} color={COLORS.primary} />}
-                text={genresTxt}
-                a11y={`Genres : ${genresTxt}`}
-              />
-            ) : null}
-            {isMovie
-              ? (media.runtime ? (
-                  <StatTile
-                    icon={<Feather name="clock" size={19} color={COLORS.primary} />}
-                    value={fmtRuntime(media.runtime)}
-                    sub="Durée"
-                    a11y={`Durée ${fmtRuntime(media.runtime)}`}
-                  />
-                ) : null)
-              : (seasonsCount ? (
-                  <StatTile
-                    icon={<Ionicons name="layers-outline" size={21} color={COLORS.primary} />}
-                    value={`${seasonsCount} saison${seasonsCount > 1 ? 's' : ''}`}
-                    sub={totalEps ? `${totalEps} épisode${totalEps > 1 ? 's' : ''}` : undefined}
-                    a11y={`${seasonsCount} saisons${totalEps ? `, ${totalEps} épisodes` : ''}`}
-                  />
-                ) : null)}
-          </StatTiles>
+            <StatTiles>
+              {media.voteAverage ? (
+                <StatTile
+                  icon={<Ionicons name="star" size={21} color={COLORS.tertiary} />}
+                  value={`${rating5(media.voteAverage, 10)}/5`}
+                  sub="Note TMDb"
+                  a11y={`Note ${rating5(media.voteAverage, 10)} sur 5`}
+                />
+              ) : null}
+              {genresTxt ? (
+                <StatTile
+                  icon={<MaterialCommunityIcons name="drama-masks" size={21} color={COLORS.primary} />}
+                  text={genresTxt}
+                  a11y={`Genres : ${genresTxt}`}
+                />
+              ) : null}
+              {isMovie
+                ? (media.runtime ? (
+                    <StatTile
+                      icon={<Feather name="clock" size={19} color={COLORS.primary} />}
+                      value={fmtRuntime(media.runtime)}
+                      sub="Durée"
+                      a11y={`Durée ${fmtRuntime(media.runtime)}`}
+                    />
+                  ) : null)
+                : (seasonsCount ? (
+                    <StatTile
+                      icon={<Ionicons name="layers-outline" size={21} color={COLORS.primary} />}
+                      value={`${seasonsCount} saison${seasonsCount > 1 ? 's' : ''}`}
+                      sub={totalEps ? `${totalEps} épisode${totalEps > 1 ? 's' : ''}` : undefined}
+                      a11y={`${seasonsCount} saisons${totalEps ? `, ${totalEps} épisodes` : ''}`}
+                    />
+                  ) : null)}
+            </StatTiles>
+          </>
         }
       >
         <Text style={styles.identityMeta}>{identityMeta}</Text>
-        {!isMovie ? (
-          <FicheTabs
-            options={[
-              { value: 'À PROPOS', label: 'À propos' },
-              { value: 'ÉPISODES', label: 'Épisodes' },
-            ]}
-            value={tab}
-            onChange={setTab}
-            accessibilityLabel="Sections de la fiche"
-          />
-        ) : null}
       </FicheIdentity>
     </>
   );

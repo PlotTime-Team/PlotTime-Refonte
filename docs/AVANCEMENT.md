@@ -169,6 +169,14 @@ signalement, temps de jeu) inchangés.
   « Sortie le … » (doublon de la tuile date) — l'info consoles est visible dès
   l'ouverture, sans scroller ; la rangée « Plateformes » quitte la carte
   Informations (Développeur / Éditeur / Modes restent).
+- **Retours Étienne v4 (2026-07-24, les 3 fiches)** : **bannière légèrement
+  rehaussée** (196→220 / 252→276) pour en voir un peu plus ; **onglets
+  À propos / Épisodes en pleine largeur** sous la carte d'identité (série) —
+  comblent le vide sous la jaquette ; **barre de progression déplacée EN HAUT**
+  de la bannière (bord à bord, sous la zone système) : la carte d'identité
+  chevauchant le bas n'en laissait voir que les deux bouts (surtout « À jour »
+  en vert) — en haut elle est lisible d'un coup d'œil (`FicheBanner topInset`,
+  `accessibilityRole="progressbar"`).
 - **Primitives partagées** (`ScreenHeader`, `SectionHeader`, `TabHeader`,
   en-têtes de bibliothèque) : échelle typographique resserrée et suppression des
   API de sur-titre/sous-titre décoratives, afin d’imposer un titre unique par
