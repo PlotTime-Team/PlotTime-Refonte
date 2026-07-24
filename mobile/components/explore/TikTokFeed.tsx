@@ -49,17 +49,23 @@ export function TikTokFeed({ topInset = 0 }: { topInset?: number }) {
   const scrollY = useRef(0); // offset vertical courant du flux (pour le pull-to-refresh web+natif)
 
   // Garde « une seule carte par swipe » — WEB uniquement (retour Étienne
-  // 2026-07-21). Le natif s'appuie sur pagingEnabled + disableIntervalMomentum ;
-  // sur web, RNW n'émet QUE onScroll (pas de phase drag/momentum) et Chromium
-  // ignore `scroll-snap-stop` pendant l'inertie → un fling fort saute plusieurs
-  // cartes. On borne donc chaque geste à ±1 carte autour d'une « ancre » (carte
-  // de départ) : dès que l'inertie dépasse la carte voisine, on la fige sur la
-  // frontière. `anchorRef` est (re)calé au toucher et à la stabilisation ;
-  // `suppressClampUntil` neutralise la garde pendant nos défilements
-  // programmatiques (avance, tirage, restauration de position).
-  const anchorRef = useRef(0);
+  // 2026-07-21). Le natif s'appuie sur pagingEnabled + disableIntervalMomentum.
+  // Sur Safari / iOS / Firefox, `scroll-snap-stop: always` (posé plus bas)
+  // suffit : le navigateur s'arrête tout seul à chaque carte — on ne touche donc
+  // à RIEN pendant le geste. Seul Blink (Chrome/Android) ignore `scroll-snap-stop`
+  // pendant l'inertie → un fling fort saute plusieurs cartes. On corrige alors
+  // APRÈS stabilisation (≈140 ms sans event, scroll immobilisé), JAMAIS pendant
+  // l'inertie : si la position finale dépasse d'une carte la dernière carte au
+  // repos, on ramène en douceur à la carte voisine, une seule fois.
+  //
+  // ⚠️ L'ancienne garde bornait l'offset à CHAQUE frame via scrollToOffset : elle
+  // luttait contre l'inertie du navigateur image par image. Sur WebKit (iOS),
+  // ça interrompait le snap natif et renvoyait sur la carte de départ (« il faut
+  // swiper deux fois ») ; ça pouvait aussi figer le rendu. La correction
+  // post-stabilisation supprime cette lutte.
+  const restedCardRef = useRef(0); // dernière carte au repos (web)
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressClampUntil = useRef(0);
+  const suppressCorrectUntil = useRef(0); // neutralise la correction pendant un défilement programmatique
 
   // Session d'onglet (position + choix optimistes), module-scope : survit aux
   // remontages (fiche, recherche, masquage d'onglet). Un re-tap de l'onglet
@@ -145,8 +151,8 @@ export function TikTokFeed({ topInset = 0 }: { topInset?: number }) {
         if (d.length === 0 || h <= 0) return;
         const idx = Math.max(0, Math.min(useFeedSessionStore.getState().index, d.length - 1));
         scrollY.current = idx * h; // le pull-to-refresh ne doit capter qu'en haut
-        anchorRef.current = idx; // recale l'ancre de la garde « 1 carte »
-        suppressClampUntil.current = Date.now() + 500; // saut programmatique : ne pas brider
+        restedCardRef.current = idx; // recale la carte au repos de la garde « 1 carte »
+        suppressCorrectUntil.current = Date.now() + 500; // saut programmatique : ne pas corriger
         listRef.current?.scrollToIndex({ index: idx, animated: false });
       });
       return () => cancelAnimationFrame(raf);
@@ -162,35 +168,36 @@ export function TikTokFeed({ topInset = 0 }: { topInset?: number }) {
     };
   }, []);
 
-  // Neutralise la garde « 1 carte » le temps d'un défilement programmatique et
-  // recale l'ancre sur la carte visée (web only ; no-op ailleurs).
+  // Neutralise la correction le temps d'un défilement programmatique et recale
+  // la carte au repos sur la carte visée (web only ; no-op ailleurs).
   const markProgrammatic = useCallback((index: number) => {
-    anchorRef.current = index;
-    suppressClampUntil.current = Date.now() + 500;
+    restedCardRef.current = index;
+    suppressCorrectUntil.current = Date.now() + 500;
   }, []);
 
-  // Cœur de la garde : appelée à chaque onScroll (web). Recale l'ancre à la
-  // stabilisation ; tant qu'un geste est en cours, borne l'offset à ±1 carte.
-  const clampOneCard = useCallback(
-    (offsetY: number) => {
-      if (Platform.OS !== 'web' || height <= 0) return;
-      // Débounce de stabilisation : quand le défilement se calme (~140 ms sans
-      // event), l'ancre devient la carte réellement affichée.
-      if (settleTimer.current) clearTimeout(settleTimer.current);
-      settleTimer.current = setTimeout(() => {
-        anchorRef.current = Math.round(scrollY.current / height);
-      }, 140);
-      if (Date.now() < suppressClampUntil.current) return; // saut programmatique
-      const hi = (anchorRef.current + 1) * height;
-      const lo = (anchorRef.current - 1) * height;
-      if (offsetY > hi + 1) {
-        listRef.current?.scrollToOffset({ offset: hi, animated: false });
-      } else if (offsetY < lo - 1) {
-        listRef.current?.scrollToOffset({ offset: Math.max(0, lo), animated: false });
+  // Cœur de la garde : appelée à chaque onScroll (web) mais NE CORRIGE PAS pendant
+  // l'inertie. Elle arme un minuteur qui se déclenche ~140 ms après le dernier
+  // event (scroll immobilisé) ; là seulement, si la position finale a dépassé la
+  // carte au repos de plus d'une carte (fling Blink), on ramène en douceur à la
+  // carte voisine — une seule fois, sans lutter contre l'inertie du navigateur.
+  const guardOneCard = useCallback(() => {
+    if (Platform.OS !== 'web' || height <= 0) return;
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      const landed = Math.round(scrollY.current / height);
+      if (Date.now() < suppressCorrectUntil.current) {
+        restedCardRef.current = landed; // pendant/juste après un saut programmatique : on adopte, sans corriger
+        return;
       }
-    },
-    [height],
-  );
+      const start = restedCardRef.current;
+      const target = landed > start + 1 ? start + 1 : landed < start - 1 ? Math.max(0, start - 1) : landed;
+      restedCardRef.current = target;
+      if (target !== landed) {
+        suppressCorrectUntil.current = Date.now() + 500; // ne pas re-corriger pendant l'animation de recentrage
+        listRef.current?.scrollToIndex({ index: target, animated: true });
+      }
+    }, 140);
+  }, [height]);
 
   const invalidateLibrary = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['shows'] });
@@ -339,12 +346,12 @@ export function TikTokFeed({ topInset = 0 }: { topInset?: number }) {
             // Web : un toucher démarre un geste → l'ancre de la garde « 1 carte »
             // devient la carte actuellement affichée (no-op en natif).
             onTouchStart={() => {
-              if (Platform.OS === 'web' && height > 0) anchorRef.current = Math.round(scrollY.current / height);
+              if (Platform.OS === 'web' && height > 0) restedCardRef.current = Math.round(scrollY.current / height);
             }}
             onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
               scrollY.current = e.nativeEvent.contentOffset.y;
               maybeEndRefresh(e.nativeEvent.contentOffset.y);
-              clampOneCard(e.nativeEvent.contentOffset.y);
+              guardOneCard();
             }}
             // Position finale fiable après snap/momentum (onScroll throttlé peut
             // rater la dernière frame → le pull-to-refresh volait des swipes).
