@@ -110,6 +110,35 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 
 ## Journal des modifications
 
+### 2026-07-24 — Claude/Étienne : filtre/tri de la bibliothèque Jeux (+ plateforme) persisté et indépendant
+La bibliothèque Jeux du Profil (« voir tout ») disposait de ses sections
+(Voulus / Possédés / En cours / Terminés / Abandonnés) mais d'AUCUN filtre/tri,
+contrairement à Séries et Films. Ajouté, avec en plus un filtre **plateforme**.
+- **Feuille « Organiser les jeux »** (même DA que Séries/Films) : **Trier par**
+  (Ordre personnalisé / Dernier ajout / Ordre alphabétique), **Statut** (Tous /
+  Voulus / Possédés / En cours / Terminés / Abandonnés), **Plateforme** (Toutes
+  + une puce par console de la bibliothèque, classées **récente → ancienne**
+  comme la recherche Explorer). Bouton filtres dans l'en-tête + bouton FILTRER
+  flottant + pastille « filtres actifs ». `RÉINITIALISER` / `APPLIQUER`.
+- **Persistance INDÉPENDANTE par type** (retour Étienne) : nouveau
+  `libraryPrefs` dans le store (`{ show, movie, game }`), persisté (AsyncStorage)
+  et fusionné défensivement à l'hydratation. Trier ses **séries** en alphabétique
+  n'impacte pas le tri de ses **jeux**, et chaque réglage est retrouvé au
+  redémarrage. Les écrans **Séries** et **Films** — qui perdaient leur tri à
+  chaque réouverture (`useState`) — sont **aussi** branchés sur ce store
+  persisté.
+- **Serveur** : `/api/games` expose désormais `addedAt` (createdAt de la ligne
+  de suivi) pour alimenter le tri « Dernier ajout ». Champ additif, 297 tests
+  serveur verts.
+- **Refactor** : `PLATFORM_ORDER` / `platformRank` (+ `shortPlatform`) extraits
+  dans `lib/platforms.ts`, partagés entre la recherche Explorer et la
+  bibliothèque Jeux (fin de la duplication).
+- **Validation** : typecheck mobile + serveur 0 ; 297 tests serveur ; Playwright
+  bibliothèque Jeux 7/7 (affichage, filtre statut+plateforme → 1 résultat,
+  sauvegarde store, indépendance show/movie, persistance au « redémarrage »,
+  réinitialisation) ; non-régression fiches 11/11, Explorer (retour + filtre
+  plateforme) OK.
+
 ### 2026-07-23 — Claude/Étienne : refonte esthétique des fiches série / film / jeu (maquettes)
 Uniformisation visuelle des trois fiches d'après les 4 maquettes fournies par
 Étienne (pixel-perfect en thème Clair ; **tokens** partout donc Sombre / Sunset /

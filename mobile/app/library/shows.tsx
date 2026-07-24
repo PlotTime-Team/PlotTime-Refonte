@@ -12,6 +12,7 @@ import { useFloatingSection, FloatingSectionPill } from '@/components/FloatingSe
 import { GridSkeleton } from '@/components/skeletons';
 import { usePullRefresh } from '@/lib/usePullRefresh';
 import { useBackClose } from '@/lib/useBackClose';
+import { useAppStore } from '@/lib/store';
 
 type Sort = 'default' | 'added' | 'alpha';
 type Progress = 'all' | 'watching' | 'not_started' | 'watchlist' | 'up_to_date' | 'completed' | 'abandoned';
@@ -84,8 +85,11 @@ function sortItems(items: LibraryShow[], sort: Sort): LibraryShow[] {
 export default function LibraryShowsScreen() {
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState(false);
-  const [sort, setSort] = useState<Sort>('default');
-  const [filter, setFilter] = useState<Progress>('all');
+  // Tri / filtre PERSISTÉS et indépendants (survivent au redémarrage, sans
+  // impacter Films ni Jeux) — cf. lib/store `libraryPrefs`.
+  const sort = useAppStore((s) => s.libraryPrefs.show.sort) as Sort;
+  const filter = useAppStore((s) => s.libraryPrefs.show.filter) as Progress;
+  const setLibraryPref = useAppStore((s) => s.setLibraryPref);
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['shows', 'library'],
     queryFn: () => api.get<{ items: LibraryShow[] }>('/api/shows/library'),
@@ -149,7 +153,7 @@ export default function LibraryShowsScreen() {
         sort={sort}
         filter={filter}
         onClose={() => setSheet(false)}
-        onApply={(s, f) => { setSort(s); setFilter(f); setSheet(false); }}
+        onApply={(s, f) => { setLibraryPref('show', { sort: s, filter: f }); setSheet(false); }}
       />
     </Pop>
   );

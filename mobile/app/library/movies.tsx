@@ -13,6 +13,7 @@ import { useFloatingSection, FloatingSectionPill } from '@/components/FloatingSe
 import { GridSkeleton } from '@/components/skeletons';
 import { usePullRefresh } from '@/lib/usePullRefresh';
 import { useBackClose } from '@/lib/useBackClose';
+import { useAppStore } from '@/lib/store';
 
 type Sort = 'last_watched' | 'last_added' | 'alpha';
 type Filter = 'all' | 'seen' | 'unseen';
@@ -31,8 +32,11 @@ const FILTER_OPTS: { key: Filter; label: string }[] = [
 export default function LibraryMoviesScreen() {
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState(false);
-  const [sort, setSort] = useState<Sort>('last_watched');
-  const [filter, setFilter] = useState<Filter>('all');
+  // Tri / filtre PERSISTÉS et indépendants (survivent au redémarrage, sans
+  // impacter Séries ni Jeux) — cf. lib/store `libraryPrefs`.
+  const sort = useAppStore((s) => s.libraryPrefs.movie.sort) as Sort;
+  const filter = useAppStore((s) => s.libraryPrefs.movie.filter) as Filter;
+  const setLibraryPref = useAppStore((s) => s.setLibraryPref);
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['movies', 'library', sort, filter],
     queryFn: () => api.get<{ seen: MediaDto[]; unseen: MediaDto[] }>(`/api/movies/profile?sort=${sort}&filter=${filter}`),
@@ -138,7 +142,7 @@ export default function LibraryMoviesScreen() {
         sort={sort}
         filter={filter}
         onClose={() => setSheet(false)}
-        onApply={(s, f) => { setSort(s); setFilter(f); setSheet(false); }}
+        onApply={(s, f) => { setLibraryPref('movie', { sort: s, filter: f }); setSheet(false); }}
       />
     </Pop>
   );
