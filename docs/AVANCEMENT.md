@@ -6,6 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
+Dernière mise à jour : **2026-07-24** (Claude/Étienne) — **Refonte de l'onglet Profil sur la nouvelle maquette** : cover pleine largeur (boutons partage + réglages, avatar rond à badge de niveau, nom + certification), carte compteurs qui chevauche la cover, statistiques resserrées (icône + total | horloge + durée, séparateurs pointillés), en-têtes de section à icône colorée, affiches réduites (~5 par rangée). Aligné au plus près des proportions de la maquette.
 Dernière mise à jour : **2026-07-24** (Claude/Benjamin) — **Fix Explorer : le swipe « revient sur la même fiche »** (web). La garde « une carte par swipe » (`TikTokFeed.clampOneCard`, ajoutée le 21/07) bornait l'offset à **CHAQUE frame** via `scrollToOffset` — elle luttait contre l'inertie du navigateur. Sur **WebKit/iOS**, où `scroll-snap-stop: always` snappe déjà nativement à une carte, cette lutte **interrompait le snap natif et renvoyait sur la carte de départ** → « il faut swiper deux fois ». Remplacée par une **correction post-stabilisation** (`guardOneCard`) : on ne touche à rien pendant le geste ; ~140 ms après l'arrêt du scroll, si la position finale a dépassé d'une carte la dernière carte au repos (fling **Blink** uniquement), on recentre en douceur **une seule fois** (`scrollToIndex`). No-op sur iOS/Safari/Firefox (snap natif), une seule correction douce sur Chrome/Android. **Chemin natif inchangé.** Typecheck mobile 0. *(À vérifier sur iPhone : bug de geste, non reproductible en headless.)*
 Dernière mise à jour : **2026-07-24** (Claude/Benjamin) — **Déploiement stores + assets** : (1) `SUPPORT_EMAIL` (`studio.vives.fr@gmail.com`) posé en prod et **serveur redéployé** (delta store-prep : legal/env/auth + scripts modération/démo) → l'email de contact s'affiche désormais sur `/legal/privacy` et `/legal/terms`. DB sauvegardée, **aucune migration**, **site photo vérifié intact** (même PID, non redémarré). (2) **Feature graphic Google Play 1024×500** créé (`mobile/assets/branding/feature-graphic-1024x500.png`) — générateur reproductible `mobile/scripts/feature-graphic.py` (Pillow + police Mulish + icône de branding). (3) Docs matériaux stores (`STORE-CONFIDENTIALITE.md`, `STORE-FICHES.md`) et `README_ANDROID.md` corrigé (package `com.plottime.app`).
 Dernière mise à jour : **2026-07-24** (Claude/Benjamin) — **Préparation publication stores (partie code)** : (1) **Permission photos iOS** (`NSPhotoLibraryUsageDescription` via plugin `expo-image-picker` dans `app.json`) — sans elle l'app **crash** au sélecteur d'avatar/bannière → rejet Apple 5.1.1. (2) **Outil de modération** CLI serveur (`pnpm --filter @serietime/server moderation` : liste / `resolve` / `dismiss` un signalement, `delete-comment` avec cascade réponses + signalements) pour tenir le SLA de modération 24 h (Apple 1.2). (3) **Compte de démo review** connectable (`create-demo-user`) même quand l'inscription e-mail est coupée (le login e-mail reste ouvert), idempotent. (4) **Pages légales** : liens d'attribution (TMDb / TheTVDB / IGDB) cliquables dans Réglages ; contact via `SUPPORT_EMAIL` (repli neutre « depuis l'application » si vide) ; date de mise à jour 24/07. (5) **Durcissement audience** du jeton Google natif (`verifyGoogleToken` accepte aussi les client IDs iOS/Android). (6) `.env.example` rafraîchi (PlotTime, `SUPPORT_EMAIL`, `ALLOW_EMAIL_SIGNUP`, bundle id, client IDs SSO natif). (7) Fichier **CI GitHub Actions** prêt (typecheck + tests serveur/packages + typecheck mobile à chaque PR) — à activer via l'interface GitHub (scope `workflow`). Vérif : **suite serveur 297/297**, typecheck serveur + mobile **0 erreur**, smoke des 2 scripts sur DB migrée OK.
@@ -109,6 +110,34 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-24 — Claude/Étienne : refonte de l'onglet Profil (maquette modernisée)
+Reproduction fidèle de la nouvelle maquette du Profil, à proportions égales
+(`mobile/app/(tabs)/profile.tsx` uniquement — aucun changement serveur).
+- **Cover pleine largeur** : remonte sous la barre d'état, coins bas arrondis,
+  dégradé de lisibilité ; deux boutons ronds **Partager** + **Réglages** en haut
+  à droite (le crayon d'édition disparaît — taper l'avatar ouvre l'édition).
+- **Identité** : avatar rond (84 px) avec **badge de niveau** incrusté, nom +
+  pastille de **certification**, ligne « Niveau N · Titre ».
+- **Compteurs sociaux** : carte qui **chevauche** le bas de la cover ; chaque
+  compteur = icône + nombre + libellé (libellés fixes au pluriel).
+- **Statistiques resserrées** : par univers, bloc gauche (icône carrée + libellé
+  + grand total + unité) **|** bloc droit (icône horloge + durée + libellé),
+  **séparateurs pointillés** entre les trois lignes.
+- **En-têtes de section à icône colorée** : puce chart (Statistiques), médaille
+  (Récompenses), tv/film/manette (collections), **cœur rose** (favoris).
+- **Affiches réduites** : largeur calculée pour ~**5 vignettes par rangée**
+  (contre ~2,5), fidèle à la densité de la maquette.
+- Orphelins retirés (ancien `HeaderActions`, styles `banner`/`editBtn`/…).
+  Vérifié au navigateur (rendu comparé à la maquette : cover, badge niveau,
+  compteurs chevauchants, stats pointillées, 5 affiches, icônes de section).
+  Typecheck mobile **0 erreur**. **Déploiement** : rebuild Web habituel (aucun
+  redémarrage serveur requis).
+- **Écarts assumés vs maquette** (signalés) : la 3ᵉ tuile compteur reste
+  **« Commentaires »** (la donnée est le nombre de commentaires, pas des
+  communautés — la maquette écrit « Communauté ») ; la pastille de certification
+  est **décorative** (aucune donnée « vérifié ») ; la tuile « +SCROLLER » de la
+  maquette n'est pas reprise (« Tout afficher » remplit ce rôle).
 
 ### 2026-07-24 — Claude/Étienne : favoris jeux à parité complète + contrôles affinés
 Suite du chantier favoris. Deux retours d'Étienne :
