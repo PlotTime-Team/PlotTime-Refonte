@@ -6,6 +6,10 @@
 >
 > Légende : 🧑 = **toi** (Benjamin) · 🤖 = **Claude peut le faire** (demande-moi) ·
 > ☁️ = **fait dans le cloud** (EAS / Apple).
+>
+> 📎 **Matériaux prêts à coller** (générés depuis le code réel) :
+> `docs/STORE-CONFIDENTIALITE.md` (déclarations App Privacy Apple + Data Safety Google) ·
+> `docs/STORE-FICHES.md` (nom, sous-titre, description, mots-clés, classification d'âge, visuels requis).
 
 ---
 

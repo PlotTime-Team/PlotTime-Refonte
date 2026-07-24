@@ -48,7 +48,7 @@ cd serietime/mobile
 npx expo run:android      # nécessite Android SDK + JDK 17
 ```
 
-Package Android : `com.serietime.app` · Nom affiché : `SerieTime` · Icône adaptive jaune générée
+Package Android : `com.plottime.app` · Nom affiché : `PlotTime` · Icône adaptive générée
 par `scripts/icons.mjs`.
 
 ## 3. Comportements natifs
