@@ -34,7 +34,7 @@ export default function AgendaScreen() {
   return (
     <View key={resetSeq} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TabHeader title="Agenda" leading={<ViewModeToggle tab="agenda" />} />
+        <TabHeader title="Agenda" leading={<ViewModeToggle viewKey={`agenda:${tab}`} />} />
         <SegmentedFilter
           options={TAB_OPTIONS}
           value={tab}
@@ -74,7 +74,7 @@ function groupMoviesByMonth(items: MovieUpcoming[]): { label: string; items: Mov
 
 function MoviesUpcoming() {
   const router = useRouter();
-  const gridView = useGridView('agenda');
+  const gridView = useGridView('agenda:movies');
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['movies'],
     queryFn: () => api.get<MoviesResponse>('/api/movies'),
@@ -145,7 +145,7 @@ type GamesUpcomingResponse = { groups: { label: string; items: GameUpcomingItemD
 
 function GamesUpcoming() {
   const router = useRouter();
-  const gridView = useGridView('agenda');
+  const gridView = useGridView('agenda:games');
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['games', 'upcoming'],
     queryFn: () => api.get<GamesUpcomingResponse>('/api/games/upcoming'),

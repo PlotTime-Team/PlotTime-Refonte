@@ -12,26 +12,26 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, FONTS, RADIUS, SIZES, SPACE } from '@/lib/theme';
-import { useAppStore, type GridViewTab } from '@/lib/store';
+import { useAppStore, type GridViewKey } from '@/lib/store';
 
 // Vue « grille d'affiches » (retour Étienne 2026-07-21) : alternative aux cartes
 // dans Accueil et Agenda, activée par le bouton d'en-tête (ViewModeToggle). Un
-// réglage INDÉPENDANT par onglet ('home' / 'agenda'), persisté dans le store.
+// réglage INDÉPENDANT par SOUS-ONGLET (`home:series`, `agenda:games`…), persisté.
 
-// Lit la préférence d'un onglet (tolérant à un ancien réglage booléen persisté).
-export function useGridView(tab: GridViewTab): boolean {
-  return useAppStore((s) => (s.gridView && typeof s.gridView === 'object' ? !!s.gridView[tab] : false));
+// Lit la préférence d'un sous-onglet (tolérant à un ancien réglage persisté).
+export function useGridView(key: GridViewKey): boolean {
+  return useAppStore((s) => (s.gridView && typeof s.gridView === 'object' ? !!s.gridView[key] : false));
 }
 
 // Bouton d'en-tête (posé à gauche via TabHeader.leading) : icône grille quand on
 // est en cartes (tap → grille), icône liste quand on est en grille (tap → cartes).
-// `tab` désigne l'onglet contrôlé — chaque onglet a son propre réglage.
-export function ViewModeToggle({ tab }: { tab: GridViewTab }) {
-  const grid = useGridView(tab);
+// `viewKey` = sous-onglet ACTIF (onglet:type) — chacun a son propre réglage.
+export function ViewModeToggle({ viewKey }: { viewKey: GridViewKey }) {
+  const grid = useGridView(viewKey);
   const setGrid = useAppStore((s) => s.setGridView);
   return (
     <Pressable
-      onPress={() => setGrid(tab, !grid)}
+      onPress={() => setGrid(viewKey, !grid)}
       hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={grid ? 'Afficher en liste de cartes' : "Afficher en grille d'affiches"}

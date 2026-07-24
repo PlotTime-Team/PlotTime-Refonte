@@ -9,7 +9,7 @@ import { api, tmdbImage } from '@/lib/api';
 import type { EpisodeDto, MediaDto, QueueItemDto, UpcomingItemDto } from '@/lib/types';
 import { queueGroupLabel, episodeCode, episodeCodeCompact, airTimeLabel } from '@/lib/format';
 import { COLORS, SHADOW, FONTS, RADIUS, SPACE, SIZES } from '@/lib/theme';
-import { PillHeader, EmptyState, LoadError, ShowPill, Badge, CheckCircle } from '@/components/ui';
+import { PillHeader, EmptyState, LoadError, Badge, CheckCircle } from '@/components/ui';
 import { EpisodeQueueCard } from '@/components/EpisodeQueueCard';
 import { EpisodeSheet, type EpisodeSheetTarget } from '@/components/EpisodeSheet';
 import { useTabResetSeq } from '@/lib/tabReset';
@@ -58,7 +58,7 @@ export default function ShowsScreen() {
   return (
     <View key={resetSeq} style={{ flex: 1, backgroundColor: COLORS.pageMuted }}>
       <View style={[styles.homeHeader, { paddingTop: insets.top }]}>
-        <TabHeader title="À voir" leading={<ViewModeToggle tab="home" />} trailing={<HomeHeaderActions />} />
+        <TabHeader title="À voir" leading={<ViewModeToggle viewKey={`home:${tab}`} />} trailing={<HomeHeaderActions />} />
         <SegmentedFilter
           options={HOME_TABS}
           value={tab}
@@ -144,7 +144,7 @@ const QueueRow = React.memo(function QueueRow({
 function QueueView() {
   const qc = useQueryClient();
   const router = useRouter();
-  const gridView = useGridView('home');
+  const gridView = useGridView('home:series');
   // L'historique est masqué au-dessus de la liste : on cale le scroll initial
   // juste en dessous, il se découvre en faisant défiler vers le haut (TV Time).
   const scrollRef = useRef<ScrollView>(null);
@@ -429,7 +429,7 @@ type MoviesResponse = { toWatch: MediaDto[]; upcoming: { media: MediaDto; releas
 
 function MoviesToWatchView() {
   const router = useRouter();
-  const gridView = useGridView('home');
+  const gridView = useGridView('home:movies');
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['movies'],
     queryFn: () => api.get<MoviesResponse>('/api/movies'),
@@ -508,7 +508,7 @@ type HomeGameDto = {
 
 function GamesWishlistView() {
   const router = useRouter();
-  const gridView = useGridView('home');
+  const gridView = useGridView('home:games');
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['games', 'library'],
     queryFn: () => api.get<{ wishlist: HomeGameDto[] }>('/api/games'),
@@ -786,8 +786,8 @@ function FeaturedHero({
 export function UpcomingView() {
   const router = useRouter();
   // UpcomingView est la vue « Séries » de l'AGENDA (bien que définie ici) → son
-  // réglage grille suit l'onglet Agenda, pas Accueil.
-  const gridView = useGridView('agenda');
+  // réglage grille suit le sous-onglet Séries de l'Agenda (indépendant).
+  const gridView = useGridView('agenda:series');
   // Historique des sorties (HIER, AVANT-HIER…) masqué au-dessus de la liste,
   // comme l'historique de visionnage de « À voir » : le scroll initial se cale
   // sur AUJOURD'HUI, on remonte pour rattraper une sortie manquée.
@@ -935,35 +935,34 @@ const UpcomingCard = React.memo(function UpcomingCard({ item, past = false }: { 
       {thumbUri ? (
         <Image source={{ uri: thumbUri }} style={[styles.thumb, past && styles.thumbPast]} resizeMode="cover" accessible={false} />
       ) : (
-        <View style={[styles.thumb, past && styles.thumbPast]} accessible={false}>
-          <Feather name="image" size={26} color={COLORS.textSoft} />
+        <View style={[styles.thumb, styles.thumbEmpty, past && styles.thumbPast]} accessible={false}>
+          <Feather name="image" size={20} color={COLORS.textSoft} />
         </View>
       )}
       <View style={styles.body}>
-        <View style={styles.topRow}>
-          <View style={{ flexShrink: 1 }}>
-            <ShowPill label={item.media.title} onPress={() => router.push(`/show/${item.media.id}`)} />
-          </View>
-          {air || ep.network ? (
-            <View style={styles.schedule}>
-              {air ? <Text style={styles.time}>{air}</Text> : null}
-              {ep.network ? <Text style={styles.ch}>{ep.network}</Text> : null}
-            </View>
+        <Text style={styles.upTitle} numberOfLines={1}>
+          {item.media.title}
+        </Text>
+        <View style={styles.upCodeRow}>
+          <Text style={styles.upEpLine} numberOfLines={1}>
+            {episodeCodeCompact(ep.seasonNumber, ep.episodeNumber)} — {ep.title}
+          </Text>
+          {item.episodes.length > 1 ? (
+            <Text style={styles.upPlus}>+{item.episodes.length - 1}</Text>
           ) : null}
         </View>
-        <Text style={styles.code}>{episodeCode(ep.seasonNumber, ep.episodeNumber)}</Text>
-        <Text style={styles.epTitle} numberOfLines={1}>
-          {ep.title}
-        </Text>
         {isPremiere ? (
           <View style={styles.badgeRow}>
             <Badge label="PREMIERE" variant="black" />
           </View>
         ) : null}
-        {item.episodes.length > 1 ? (
-          <Text style={styles.multi}>{item.episodes.length} épisodes</Text>
-        ) : null}
       </View>
+      {air || ep.network ? (
+        <View style={styles.upSchedule}>
+          {air ? <Text style={styles.time}>{air}</Text> : null}
+          {ep.network ? <Text style={styles.ch} numberOfLines={1}>{ep.network}</Text> : null}
+        </View>
+      ) : null}
     </Pressable>
   );
 });
@@ -1013,34 +1012,45 @@ const styles = StyleSheet.create({
   },
   agendaPastWrap: { width: '100%', maxWidth: SIZES.contentMax },
   agendaGroup: { width: '100%', maxWidth: SIZES.contentMax },
+  // Carte Agenda alignée sur la DA de l'Accueil (EpisodeQueueCard) : vignette
+  // arrondie 60×80, titre, « S2·E1 — Titre », horaire + chaîne à droite (à la
+  // place de la coche — un épisode à venir ne se coche pas). Retour Étienne 24/07.
   upcard: {
     flexDirection: 'row',
-    minHeight: 112,
+    alignItems: 'center',
+    minHeight: 104,
     marginHorizontal: SPACE.md,
     marginBottom: SPACE.sm,
+    padding: SPACE.sm,
+    gap: SPACE.sm,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.borderLight,
     borderRadius: RADIUS.card,
-    overflow: 'hidden',
     ...SHADOW.card,
   },
   upcardPast: { backgroundColor: COLORS.surfaceMuted, borderColor: COLORS.border },
-  upcardPressed: { opacity: 0.84 },
+  upcardPressed: { opacity: 0.9 },
   thumb: {
-    width: 112,
-    minHeight: 112,
+    width: 60,
+    height: 80,
+    flexShrink: 0,
+    borderRadius: RADIUS.poster,
     backgroundColor: COLORS.imagePlaceholder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbPast: { opacity: 0.82 },
-  body: { flex: 1, justifyContent: 'center', paddingHorizontal: SPACE.sm, paddingVertical: SPACE.sm, gap: SPACE.xxs },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACE.xs, alignItems: 'flex-start' },
-  schedule: { alignItems: 'flex-end', flexShrink: 0, minHeight: SIZES.touch },
+  thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
+  thumbPast: { opacity: 0.68 },
+  body: { flex: 1, minWidth: 0, gap: 5 },
+  upTitle: { color: COLORS.text, fontSize: 16, lineHeight: 21, fontFamily: FONTS.extraBold },
+  upCodeRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACE.xs },
+  upEpLine: { flexShrink: 1, color: COLORS.textMuted, fontFamily: FONTS.medium, fontSize: 13, lineHeight: 18 },
+  upPlus: { fontSize: 12, lineHeight: 18, fontFamily: FONTS.extraBold, color: COLORS.plusCount, flexShrink: 0 },
+  upSchedule: { flexShrink: 0, alignItems: 'flex-end', justifyContent: 'center', minWidth: 48, gap: 2 },
   time: { color: COLORS.text, fontSize: 13, lineHeight: 17, fontFamily: FONTS.extraBold },
   ch: {
-    maxWidth: 96,
+    maxWidth: 84,
     color: COLORS.textMuted,
     fontSize: 10,
     lineHeight: 14,
@@ -1048,10 +1058,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     textAlign: 'right',
   },
-  code: { color: COLORS.text, fontSize: 17, lineHeight: 22, fontFamily: FONTS.extraBold },
-  epTitle: { color: COLORS.textMuted, fontFamily: FONTS.regular, fontSize: 13, lineHeight: 18 },
   badgeRow: { flexDirection: 'row', marginTop: 2 },
-  multi: { color: COLORS.secondary, fontFamily: FONTS.bold, fontSize: 12, lineHeight: 16, marginTop: SPACE.xxs },
   // Raccourcis d'en-tête Accueil (cloche + avatar, disposition maquette).
   // Icône nue, calée à droite (façon Instagram) : cible 44 px conservée, le
   // glyphe affleure au padding de l'écran.

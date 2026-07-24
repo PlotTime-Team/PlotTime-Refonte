@@ -647,11 +647,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   levelLine: { color: 'rgba(255,255,255,0.86)', fontSize: 13.5, lineHeight: 18, fontFamily: FONTS.semiBold, marginTop: 3 },
-  // Compteurs sociaux — carte qui CHEVAUCHE le bas de la cover.
+  // Compteurs sociaux — carte qui chevauche LÉGÈREMENT le bas de la cover, sans
+  // toucher l'avatar/le badge de niveau (retour Étienne 24/07 : chevauchement).
   counters: {
     flexDirection: 'row',
     marginHorizontal: SPACE.md,
-    marginTop: -26,
+    marginTop: -12,
     zIndex: 2,
     overflow: 'hidden',
     borderRadius: RADIUS.card,

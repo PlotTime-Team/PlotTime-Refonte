@@ -6,6 +6,7 @@
 > 2. ajouter une entrée datée en tête du « Journal des modifications » (date, auteur, résumé) ;
 > 3. déplacer les éléments terminés de « Prochaines étapes » vers le journal.
 
+Dernière mise à jour : **2026-07-24** (Claude/Étienne) — **Agenda : cartes alignées sur la DA de l'Accueil** (vignette arrondie + titre + « S·E — titre » + horaire/chaîne à droite) ; **bascule cartes/mosaïque INDÉPENDANTE par sous-onglet** (Séries/Films/Jeux) sur Accueil et Agenda ; **Profil : compteurs descendus** (ne chevauchent plus le badge de niveau de l'avatar).
 Dernière mise à jour : **2026-07-24** (Claude/Étienne) — **Refonte de l'onglet Profil sur la nouvelle maquette** : cover pleine largeur (boutons partage + réglages, avatar rond à badge de niveau, nom + certification), carte compteurs qui chevauche la cover, statistiques resserrées (icône + total | horloge + durée, séparateurs pointillés), en-têtes de section à icône colorée, affiches réduites (~5 par rangée). Aligné au plus près des proportions de la maquette.
 Dernière mise à jour : **2026-07-24** (Claude/Benjamin) — **Fix Explorer : le swipe « revient sur la même fiche »** (web). La garde « une carte par swipe » (`TikTokFeed.clampOneCard`, ajoutée le 21/07) bornait l'offset à **CHAQUE frame** via `scrollToOffset` — elle luttait contre l'inertie du navigateur. Sur **WebKit/iOS**, où `scroll-snap-stop: always` snappe déjà nativement à une carte, cette lutte **interrompait le snap natif et renvoyait sur la carte de départ** → « il faut swiper deux fois ». Remplacée par une **correction post-stabilisation** (`guardOneCard`) : on ne touche à rien pendant le geste ; ~140 ms après l'arrêt du scroll, si la position finale a dépassé d'une carte la dernière carte au repos (fling **Blink** uniquement), on recentre en douceur **une seule fois** (`scrollToIndex`). No-op sur iOS/Safari/Firefox (snap natif), une seule correction douce sur Chrome/Android. **Chemin natif inchangé.** Typecheck mobile 0. *(À vérifier sur iPhone : bug de geste, non reproductible en headless.)*
 Dernière mise à jour : **2026-07-24** (Claude/Benjamin) — **Déploiement stores + assets** : (1) `SUPPORT_EMAIL` (`studio.vives.fr@gmail.com`) posé en prod et **serveur redéployé** (delta store-prep : legal/env/auth + scripts modération/démo) → l'email de contact s'affiche désormais sur `/legal/privacy` et `/legal/terms`. DB sauvegardée, **aucune migration**, **site photo vérifié intact** (même PID, non redémarré). (2) **Feature graphic Google Play 1024×500** créé (`mobile/assets/branding/feature-graphic-1024x500.png`) — générateur reproductible `mobile/scripts/feature-graphic.py` (Pillow + police Mulish + icône de branding). (3) Docs matériaux stores (`STORE-CONFIDENTIALITE.md`, `STORE-FICHES.md`) et `README_ANDROID.md` corrigé (package `com.plottime.app`).
@@ -110,6 +111,31 @@ la migration visuelle doit encore être exécutée sans modifier la logique mét
 6. Publication native optionnelle (EAS Build APK, puis stores).
 
 ## Journal des modifications
+
+### 2026-07-24 — Claude/Étienne : Agenda aligné sur l'Accueil + grille indépendante par sous-onglet + profil dé-chevauché
+Trois retours d'Étienne (captures) :
+1. **DA des cartes Agenda = Accueil** (`mobile/app/(tabs)/index.tsx`,
+   `UpcomingCard`) : la carte des sorties « série » reprend exactement la DA de
+   l'Accueil (`EpisodeQueueCard`) — vignette arrondie **60×80** à gauche, titre
+   en gras, ligne **« S2·E1 — Titre »** (`episodeCodeCompact`), et **horaire +
+   chaîne à droite** (à la place de la coche : un épisode à venir ne se coche
+   pas). Fini la pilule de titre + grande affiche carrée. Styles orphelins
+   retirés (`topRow`/`schedule`/`code`/`epTitle`/`multi`, import `ShowPill`).
+2. **Bascule cartes/mosaïque INDÉPENDANTE par sous-onglet** (`lib/store.ts`,
+   `components/PosterGrid.tsx`, `index.tsx`, `agenda.tsx`) : le réglage grille
+   n'est plus par onglet (`home`/`agenda`) mais par **couple onglet:type**
+   (`home:series`, `home:movies`, `home:games`, `agenda:*`). Le bouton d'en-tête
+   agit sur le **sous-onglet actif** ; on peut donc avoir Séries en cartes et
+   Films en mosaïque simultanément. Anciennes clés booléennes ignorées (défaut
+   cartes) — pas de migration nécessaire.
+3. **Profil — compteurs descendus** (`profile.tsx`) : la carte
+   Abonnements/Abonnés/Commentaires chevauchait le badge de niveau de l'avatar ;
+   son chevauchement de la cover est réduit (`marginTop −26 → −12`) — elle passe
+   sous l'avatar sans le toucher.
+Vérifié au navigateur : carte Agenda identique à l'Accueil (horaire/chaîne à
+droite) ; Séries en grille + Films en cartes conservés indépendamment ;
+compteurs dégagés du badge. Typecheck mobile **0 erreur**. Déploiement : rebuild
+Web habituel (aucun changement serveur).
 
 ### 2026-07-24 — Claude/Étienne : refonte de l'onglet Profil (maquette modernisée)
 Reproduction fidèle de la nouvelle maquette du Profil, à proportions égales

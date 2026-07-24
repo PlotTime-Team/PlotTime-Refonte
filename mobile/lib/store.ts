@@ -25,9 +25,10 @@ type AppState = {
   // impacter le tri de ses jeux, et retrouver le réglage au redémarrage). Les
   // valeurs sont validées par chaque écran (il ne pose que ses propres options).
   libraryPrefs: LibraryPrefs;
-  // Affichage cartes (false) / grille d'affiches (true), INDÉPENDANT par onglet
-  // (Accueil et Agenda ont chacun leur réglage). Persisté.
-  gridView: { home: boolean; agenda: boolean };
+  // Affichage cartes (false) / grille d'affiches (true), INDÉPENDANT par
+  // SOUS-ONGLET : chaque couple onglet:type (`home:series`, `agenda:games`…) a
+  // son propre réglage (retour Étienne 24/07). Persisté. Clé absente = cartes.
+  gridView: Partial<Record<GridViewKey, boolean>>;
   // Dernier type de recherche utilisé dans Explorer (persisté) : on y revient
   // par défaut (ex. ajouter plein de jeux sans re-cliquer « Jeux » à chaque fois).
   searchType: SearchType;
@@ -36,12 +37,15 @@ type AppState = {
   setCoverPick: (url: string | null) => void;
   setFavSort: (kind: MediaType, sort: FavSortKey) => void;
   setLibraryPref: <K extends keyof LibraryPrefs>(kind: K, patch: Partial<LibraryPrefs[K]>) => void;
-  setGridView: (tab: 'home' | 'agenda', on: boolean) => void;
+  setGridView: (key: GridViewKey, on: boolean) => void;
   setSearchType: (t: SearchType) => void;
   logout: () => void;
 };
 
-export type GridViewTab = 'home' | 'agenda';
+// Clé de réglage grille : onglet:sous-onglet (indépendant par type de contenu).
+export type GridViewKey =
+  | 'home:series' | 'home:movies' | 'home:games'
+  | 'agenda:series' | 'agenda:movies' | 'agenda:games';
 export type SearchType = 'media' | 'games' | 'users';
 
 // Réglages de bibliothèque persistés, indépendants par type. Valeurs libres
@@ -68,7 +72,7 @@ export const useAppStore = create<AppState>()(
       coverPick: null,
       favSort: { show: 'user', movie: 'user', game: 'user' },
       libraryPrefs: DEFAULT_LIBRARY_PREFS,
-      gridView: { home: false, agenda: false },
+      gridView: {},
       searchType: 'media',
       setServerUrl: (url) => set({ serverUrl: url.replace(/\/+$/, '') }),
       setAuth: (token, user) => set({ token, user }),
@@ -76,10 +80,11 @@ export const useAppStore = create<AppState>()(
       setFavSort: (kind, sort) => set((s) => ({ favSort: { ...s.favSort, [kind]: sort } })),
       setLibraryPref: (kind, patch) =>
         set((s) => ({ libraryPrefs: { ...s.libraryPrefs, [kind]: { ...s.libraryPrefs[kind], ...patch } } })),
-      setGridView: (tab, on) =>
+      setGridView: (key, on) =>
         set((s) => ({
-          // Tolérant à un ancien réglage booléen persisté (auto-guérison).
-          gridView: { ...(s.gridView && typeof s.gridView === 'object' ? s.gridView : { home: false, agenda: false }), [tab]: on },
+          // Tolérant à un ancien réglage persisté (auto-guérison) — les anciennes
+          // clés `home`/`agenda` sont simplement ignorées (défaut cartes).
+          gridView: { ...(s.gridView && typeof s.gridView === 'object' ? s.gridView : {}), [key]: on },
         })),
       setSearchType: (t) => set({ searchType: t }),
       logout: () => set({ token: null, user: null }),
